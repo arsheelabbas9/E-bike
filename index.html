@@ -76,7 +76,7 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 20px;
+            margin-bottom: 30px;
             padding: 0 5px;
         }
 
@@ -282,7 +282,6 @@
             backdrop-filter: blur(16px);
             -webkit-backdrop-filter: blur(16px);
             box-shadow: var(--shadow-elevation);
-            margin-bottom: 20px;
         }
 
         .safety-header {
@@ -344,6 +343,7 @@
            8. INTERACTIVE ELEMENTS
            ========================================================================== */
         .btn-primary {
+            margin-top: 25px;
             margin-bottom: 20px;
             background: var(--text-primary);
             color: var(--bg-base);
@@ -380,21 +380,22 @@
 
     <header>
         <div class="brand-container">
-            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <!-- E-Bike / Bicycle icon -->
+            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
                 <circle cx="5.5" cy="17.5" r="3.5"></circle>
                 <circle cx="18.5" cy="17.5" r="3.5"></circle>
-                <path d="M15 17.5H9L12 10L16 17.5H15Z"></path>
-                <path d="M6 14L8 10L15 10"></path>
+                <path d="M15 6a1 1 0 0 0-1-1h-1l-3 9"></path>
+                <path d="M9 15l3-9"></path>
+                <path d="M5.5 17.5L9 9h5l3 8.5"></path>
+                <path d="M12 6h3"></path>
             </svg>
-            <h1>E-Bike</h1>
+            <h1>E-Bike </h1>
         </div>
         <div id="statusBadge" class="status-badge">
             <div id="statusDot" class="status-dot"></div>
             <span id="statusText">System Offline</span>
         </div>
     </header>
-
-    <button id="connectBtn" class="btn-primary">Connect to Device</button>
 
     <div id="diagnosticPanel">
         <div class="diag-header">
@@ -407,7 +408,7 @@
             <span id="diagTitle">Hardware Fault Detected</span>
         </div>
         <ul id="diagSteps" class="diag-list">
-        </ul>
+            </ul>
     </div>
 
     <div class="core-grid">
@@ -458,6 +459,8 @@
             <div id="gasValue" class="sensor-val" style="color: var(--text-tertiary);">-- ppm</div>
         </div>
     </div>
+
+    <button id="connectBtn" class="btn-primary">Connect to Device</button>
 
     <script>
         /**
@@ -675,7 +678,7 @@
             
             UI.btn.style.display = 'block';
             UI.btn.disabled = false;
-            UI.btn.innerText = "Connect to Device";
+            UI.btn.innerText = "Reconnect Device";
             
             bleBuffer = ""; // Flush memory
             UI.diagPanel.style.display = 'none'; 
