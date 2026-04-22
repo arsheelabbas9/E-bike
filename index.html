@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>E-Bike Dashboard</title>
+    <style>
+        :root {
+            --bg-color: #0d0d0d;
+            --panel-bg: #1a1a1a;
+            --text-main: #ffffff;
+            --text-muted: #888888;
+            --accent-blue: #00d2ff;
+            --accent-red: #ff3b30;
+            --accent-green: #34c759;
+            --accent-orange: #ff9500;
+        }
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            height: 100vh;
+        }
+        header {
+            text-align: center;
+            margin-bottom: 25px;
+            width: 100%;
+            margin-top: 10px;
+        }
+        h1 { margin: 0; font-size: 26px; font-weight: 800; letter-spacing: 2px; }
+        .status { color: var(--text-muted); font-size: 14px; margin-top: 8px; text-transform: uppercase; letter-spacing: 1px; }
+        
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            width: 100%;
+            max-width: 500px;
+        }
+        .card {
+            background: var(--panel-bg);
+            border-radius: 20px;
+            padding: 25px 10px;
+            text-align: center;
+            box-shadow: 0 8px 16px rgba(0,0,0,0.4);
+            border: 1px solid #2a2a2a;
+        }
+        .card-title {
+            color: var(--text-muted);
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 5px;
+        }
+        .value {
+            font-size: 40px;
+            font-weight: bold;
+            margin: 5px 0;
+            transition: color 0.3s;
+        }
+        .unit { font-size: 14px; color: var(--text-muted); font-weight: 500; }
+        
+        #connectBtn {
+            background: linear-gradient(135deg, #0072ff 0%, #00c6ff 100%);
+            color: white;
+            border: none;
+            border-radius: 30px;
+            padding: 20px 40px;
+            font-size: 18px;
+            font-weight: bold;
+            margin-top: 40px;
+            width: 100%;
+            max-width: 400px;
+            box-shadow: 0 8px 20px rgba(0, 198, 255, 0.3);
+            cursor: pointer;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        #connectBtn:active { transform: scale(0.97); }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>E-Bike Dashboard</h1>
+        <div id="statusText" class="status">Offline • Ready to Connect</div>
+    </header>
+
+    <div class="grid">
+        <div class="card">
+            <div class="card-title">Smoke</div>
+            <div id="smokeValue" class="value" style="color: var(--accent-blue);">0</div>
+            <div class="unit">PPM</div>
+        </div>
+        <div class="card">
+            <div class="card-title">Exhaust / Gas</div>
+            <div id="gasValue" class="value" style="color: var(--accent-blue);">0</div>
+            <div class="unit">PPM</div>
+        </div>
+        <div class="card">
+            <div class="card-title">Temperature</div>
+            <div id="tempValue" class="value" style="color: var(--accent-orange);">0</div>
+            <div class="unit">°C</div>
+        </div>
+        <div class="card">
+            <div class="card-title">Humidity</div>
+            <div id="humValue" class="value" style="color: var(--accent-green);">0</div>
+            <div class="unit">%</div>
+        </div>
+    </div>
+
+    <button id="connectBtn">Connect to E-Bike</button>
+
+    <script>
+        const bleService = '6e400001-b5a3-f393-e0a9-e50e24dcca9e';
+        const bleCharacteristic = '6e400003-b5a3-f393-e0a9-e50e24dcca9e';
+        
+        let bluetoothDevice;
+        let bleBuffer = ""; // THE NEW MEMORY BUFFER
+        
+        const connectBtn = document.getElementById('connectBtn');
+        const statusText = document.getElementById('statusText');
+        const smokeElement = document.getElementById('smokeValue');
+        const gasElement = document.getElementById('gasValue');
+        const tempElement = document.getElementById('tempValue');
+        const humElement = document.getElementById('humValue');
+
+        connectBtn.addEventListener('click', async () => {
+            try {
+                if (!navigator.bluetooth) {
+                    alert('Web Bluetooth is not supported here. Open this link in Google Chrome on Android.');
+                    return;
+                }
+
+                statusText.innerText = 'Scanning...';
+                bluetoothDevice = await navigator.bluetooth.requestDevice({
+                    filters: [{ name: 'EBike_Master' }],
+                    optionalServices: [bleService]
+                });
+
+                bluetoothDevice.addEventListener('gattserverdisconnected', onDisconnected);
+
+                statusText.innerText = 'Connecting...';
+                const server = await bluetoothDevice.gatt.connect();
+                const service = await server.getPrimaryService(bleService);
+                const characteristic = await service.getCharacteristic(bleCharacteristic);
+
+                await characteristic.startNotifications();
+                characteristic.addEventListener('characteristicvaluechanged', handleData);
+                
+                statusText.innerText = 'Live Connection Active';
+                statusText.style.color = 'var(--accent-green)';
+                connectBtn.style.display = 'none';
+
+            } catch (error) {
+                console.error(error);
+                statusText.innerText = 'Connection Failed';
+            }
+        });
+
+        // THE BULLETPROOF DATA HANDLER
+        function handleData(event) {
+            // 1. Get the new chunk of data
+            let chunk = new TextDecoder().decode(event.target.value);
+            
+            // 2. Add it to our memory buffer
+            bleBuffer += chunk;
+            
+            // 3. Only update if the buffer contains a full line (ends with \n)
+            if (bleBuffer.includes('\n')) {
+                // Split the line out of the buffer
+                let lines = bleBuffer.split('\n');
+                let completeData = lines[0]; 
+                
+                // Keep any leftover data in the buffer for next time
+                bleBuffer = lines[1] || ""; 
+                
+                let dataParts = completeData.trim().split(',');
+                
+                // If we successfully received all 4 numbers
+                if(dataParts.length === 4) {
+                    let smoke = parseInt(dataParts[0]);
+                    let gas = parseInt(dataParts[1]);
+                    let temp = parseInt(dataParts[2]);
+                    let hum = parseInt(dataParts[3]);
+
+                    // Update the screen instantly
+                    smokeElement.innerText = smoke;
+                    gasElement.innerText = gas;
+                    tempElement.innerText = temp;
+                    humElement.innerText = hum;
+
+                    // Dynamic Warning Colors
+                    smokeElement.style.color = smoke > 200 ? 'var(--accent-red)' : 'var(--accent-blue)';
+                    gasElement.style.color = gas > 200 ? 'var(--accent-red)' : 'var(--accent-blue)';
+                    tempElement.style.color = temp > 40 ? 'var(--accent-red)' : 'var(--accent-orange)';
+                }
+            }
+        }
+
+        function onDisconnected() {
+            statusText.innerText = 'Disconnected';
+            statusText.style.color = 'var(--text-muted)';
+            connectBtn.style.display = 'block';
+            bleBuffer = ""; // Clear buffer on disconnect
+            
+            smokeElement.innerText = '0';
+            gasElement.innerText = '0';
+            tempElement.innerText = '0';
+            humElement.innerText = '0';
+            
+            smokeElement.style.color = 'var(--accent-blue)';
+            gasElement.style.color = 'var(--accent-blue)';
+            tempElement.style.color = 'var(--accent-orange)';
+        }
+    </script>
+</body>
+</html>
