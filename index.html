@@ -3,28 +3,63 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Titanium OS - E-Bike</title>
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;700&family=Roboto+Mono:wght@400;700&display=swap');
+    <meta name="theme-color" content="#090a0f">
+    <title>Titanium OS | Telemetry</title>
 
+    <style>
+        /* ==========================================================================
+           1. TYPOGRAPHY & EXTERNAL ASSETS
+           ========================================================================== */
+        @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;700&family=Space+Mono:wght@400;700&display=swap');
+
+        /* ==========================================================================
+           2. CSS VARIABLES (DESIGN TOKENS)
+           ========================================================================== */
         :root {
-            --bg-dark: #05050a;
-            --glass-bg: rgba(255, 255, 255, 0.03);
-            --glass-border: rgba(255, 255, 255, 0.08);
-            --text-main: #ffffff;
-            --text-dim: #6c757d;
-            --color-safe: #00f2fe;     /* Neon Blue */
-            --color-warn: #f5af19;     /* Neon Orange */
-            --color-danger: #ff0844;   /* Neon Red */
-            --color-eco: #38ef7d;      /* Neon Green */
+            /* Backgrounds */
+            --bg-base: #090a0f;
+            --bg-gradient-top: #151828;
+            --surface-color: rgba(255, 255, 255, 0.03);
+            --surface-border: rgba(255, 255, 255, 0.06);
+            --surface-hover: rgba(255, 255, 255, 0.08);
+
+            /* Typography Colors */
+            --text-primary: #ffffff;
+            --text-secondary: #8a8d98;
+            --text-tertiary: #525560;
+
+            /* Semantic Status Colors (EV Standard) */
+            --status-safe: #00e6a3;     /* Mint / Cyan */
+            --status-warn: #ff9f0a;     /* Amber */
+            --status-danger: #ff375f;   /* Crimson */
+            --status-info: #0a84ff;     /* Azure */
+
+            /* Shadows & Glows */
+            --glow-safe: 0 0 20px rgba(0, 230, 163, 0.15);
+            --glow-warn: 0 0 25px rgba(255, 159, 10, 0.25);
+            --glow-danger: 0 0 30px rgba(255, 55, 95, 0.35);
+            --shadow-elevation: 0 10px 30px rgba(0, 0, 0, 0.5);
+
+            /* Animations */
+            --transition-smooth: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            --transition-fast: all 0.2s ease-out;
+        }
+
+        /* ==========================================================================
+           3. GLOBAL STYLES
+           ========================================================================== */
+        * {
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
         }
 
         body {
-            background: radial-gradient(circle at 50% -20%, #1a1a2e, var(--bg-dark) 80%);
-            color: var(--text-main);
-            font-family: 'Rajdhani', sans-serif;
+            background-color: var(--bg-base);
+            background-image: radial-gradient(circle at 50% -10%, var(--bg-gradient-top) 0%, var(--bg-base) 80%);
+            color: var(--text-primary);
+            font-family: 'Outfit', -apple-system, sans-serif;
             margin: 0;
-            padding: 20px;
+            padding: clamp(15px, 4vw, 30px) clamp(15px, 4vw, 20px);
             display: flex;
             flex-direction: column;
             align-items: center;
@@ -32,389 +67,647 @@
             overflow-x: hidden;
         }
 
+        /* ==========================================================================
+           4. HEADER & NAVIGATION
+           ========================================================================== */
         header {
-            text-align: center;
-            margin: 20px 0 30px 0;
             width: 100%;
+            max-width: 480px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+            padding: 0 5px;
+        }
+
+        .brand-container {
+            display: flex;
+            align-items: center;
+            gap: 10px;
         }
 
         h1 {
             margin: 0;
-            font-size: 32px;
+            font-size: clamp(20px, 5vw, 24px);
             font-weight: 700;
-            letter-spacing: 4px;
-            background: linear-gradient(to right, #fff, #888);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            text-transform: uppercase;
-        }
-
-        .status {
-            font-family: 'Roboto Mono', monospace;
-            color: var(--text-dim);
-            font-size: 12px;
-            margin-top: 5px;
             letter-spacing: 2px;
             text-transform: uppercase;
-            transition: color 0.3s ease;
         }
 
-        .pulse-dot {
-            display: inline-block;
+        /* Status Badge */
+        .status-badge {
+            background: rgba(255, 255, 255, 0.03);
+            padding: 8px 14px;
+            border-radius: 30px;
+            font-size: 12px;
+            font-weight: 500;
+            color: var(--text-secondary);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            border: 1px solid var(--surface-border);
+            transition: var(--transition-smooth);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+        }
+
+        .status-dot {
             width: 8px;
             height: 8px;
             border-radius: 50%;
-            background-color: var(--text-dim);
-            margin-right: 6px;
-            box-shadow: 0 0 10px rgba(0,0,0,0);
-            transition: all 0.3s ease;
+            background: var(--text-tertiary);
+            transition: var(--transition-smooth);
         }
 
-        .connected .pulse-dot {
-            background-color: var(--color-eco);
-            box-shadow: 0 0 12px var(--color-eco);
-            animation: pulse 2s infinite;
+        .status-dot.pulsing {
+            animation: pulse-dot 2s infinite;
         }
 
-        @keyframes pulse {
-            0% { transform: scale(0.95); opacity: 0.8; }
-            50% { transform: scale(1.2); opacity: 1; }
-            100% { transform: scale(0.95); opacity: 0.8; }
+        @keyframes pulse-dot {
+            0% { box-shadow: 0 0 0 0 rgba(10, 132, 255, 0.4); }
+            70% { box-shadow: 0 0 0 10px rgba(10, 132, 255, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(10, 132, 255, 0); }
         }
 
-        .grid {
+        /* ==========================================================================
+           5. DIAGNOSTIC SUBSYSTEM (HIDDEN BY DEFAULT)
+           ========================================================================== */
+        #diagnosticPanel {
+            width: 100%;
+            max-width: 480px;
+            background: rgba(255, 55, 95, 0.08);
+            border: 1px solid var(--status-danger);
+            border-radius: 20px;
+            padding: 20px;
+            margin-bottom: 25px;
+            display: none; /* Toggled via JS */
+            box-shadow: var(--glow-danger);
+            animation: slideDown 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        @keyframes slideDown {
+            from { opacity: 0; transform: translateY(-20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .diag-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            color: var(--status-danger);
+            font-weight: 700;
+            font-size: 16px;
+            margin-bottom: 15px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .diag-icon-wrapper {
+            background: var(--status-danger);
+            color: #fff;
+            width: 28px;
+            height: 28px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            border-radius: 50%;
+        }
+
+        .diag-list {
+            margin: 0;
+            padding-left: 20px;
+            color: rgba(255,255,255,0.85);
+            font-size: 14px;
+            line-height: 1.6;
+        }
+
+        .diag-list li { margin-bottom: 8px; }
+        .diag-highlight { 
+            color: #fff; 
+            font-weight: 700; 
+            font-family: 'Space Mono', monospace; 
+            background: rgba(255,255,255,0.1);
+            padding: 2px 6px;
+            border-radius: 4px;
+        }
+
+        /* ==========================================================================
+           6. CORE METRICS GRID (TEMP / HUMIDITY)
+           ========================================================================== */
+        .core-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
             gap: 20px;
             width: 100%;
-            max-width: 400px;
+            max-width: 480px;
+            margin-bottom: 25px;
         }
 
-        .card {
-            background: var(--glass-bg);
-            backdrop-filter: blur(12px);
-            -webkit-backdrop-filter: blur(12px);
-            border: 1px solid var(--glass-border);
+        .metric-card {
+            background: var(--surface-color);
+            border: 1px solid var(--surface-border);
             border-radius: 24px;
-            padding: 20px 10px;
-            text-align: center;
-            box-shadow: 0 15px 35px rgba(0,0,0,0.4);
+            padding: clamp(20px, 5vw, 30px) 15px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            box-shadow: var(--shadow-elevation);
             position: relative;
             overflow: hidden;
         }
 
-        .card::before {
+        /* Subtle lighting effect on cards */
+        .metric-card::before {
             content: '';
             position: absolute;
-            top: 0; left: -100%; width: 50%; height: 100%;
-            background: linear-gradient(to right, transparent, rgba(255,255,255,0.05), transparent);
-            transform: skewX(-25deg);
-            animation: shine 6s infinite;
+            top: 0; left: 0; right: 0; height: 1px;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
         }
 
-        @keyframes shine {
-            0% { left: -100%; }
-            20% { left: 200%; }
-            100% { left: 200%; }
-        }
-
-        .card-title {
-            color: var(--text-dim);
-            font-size: 14px;
-            font-weight: 700;
-            letter-spacing: 2px;
-            text-transform: uppercase;
+        .metric-header {
+            display: flex;
+            align-items: center;
+            gap: 6px;
             margin-bottom: 15px;
         }
 
-        /* SVG Circular Gauge Styles */
-        .gauge-container {
-            position: relative;
-            width: 100px;
-            height: 100px;
-            margin: 0 auto;
+        .metric-icon {
+            width: 16px;
+            height: 16px;
+            fill: var(--text-secondary);
         }
 
-        .gauge-svg {
-            transform: rotate(-90deg);
-            width: 100%;
-            height: 100%;
+        .metric-title {
+            font-size: 13px;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            font-weight: 500;
         }
 
-        .gauge-bg {
-            fill: none;
-            stroke: rgba(255, 255, 255, 0.05);
-            stroke-width: 8;
-        }
-
-        .gauge-fill {
-            fill: none;
-            stroke: var(--color-safe);
-            stroke-width: 8;
-            stroke-linecap: round;
-            stroke-dasharray: 251.2; /* 2 * pi * r (r=40) */
-            stroke-dashoffset: 251.2; /* Starts empty */
-            transition: stroke-dashoffset 0.8s cubic-bezier(0.4, 0, 0.2, 1), stroke 0.5s ease;
-        }
-
-        .gauge-data {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
+        .metric-value-container {
             display: flex;
-            flex-direction: column;
-            align-items: center;
+            align-items: baseline;
+            gap: 4px;
         }
 
-        .value {
-            font-family: 'Roboto Mono', monospace;
-            font-size: 28px;
+        .metric-value {
+            font-family: 'Space Mono', monospace;
+            font-size: clamp(36px, 10vw, 48px);
             font-weight: 700;
-            color: var(--text-main);
+            color: var(--text-primary);
             transition: color 0.5s ease;
         }
 
-        .unit {
-            font-size: 11px;
-            color: var(--text-dim);
-            letter-spacing: 1px;
-            margin-top: -4px;
-        }
-
-        #connectBtn {
-            background: rgba(255, 255, 255, 0.05);
-            border: 1px solid var(--glass-border);
-            color: var(--text-main);
-            backdrop-filter: blur(10px);
-            border-radius: 30px;
-            padding: 18px 40px;
-            font-family: 'Rajdhani', sans-serif;
+        .metric-unit {
             font-size: 18px;
-            font-weight: 700;
-            letter-spacing: 2px;
-            text-transform: uppercase;
-            margin-top: 40px;
+            color: var(--text-secondary);
+            font-weight: 500;
+        }
+
+        /* ==========================================================================
+           7. ACTIVE SAFETY MODULE (AIR QUALITY)
+           ========================================================================== */
+        .safety-bar {
             width: 100%;
-            max-width: 400px;
+            max-width: 480px;
+            background: var(--surface-color);
+            border: 1px solid var(--surface-border);
+            border-radius: 24px;
+            padding: 25px;
+            box-sizing: border-box;
+            transition: var(--transition-smooth);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            box-shadow: var(--shadow-elevation);
+        }
+
+        .safety-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+        }
+
+        .safety-title {
+            font-size: 13px;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            color: var(--text-secondary);
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .safety-status {
+            font-size: 13px;
+            font-weight: 700;
+            color: var(--status-safe);
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            background: rgba(0, 230, 163, 0.1);
+            padding: 4px 10px;
+            border-radius: 6px;
+            transition: var(--transition-smooth);
+        }
+
+        .sensor-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 0;
+        }
+
+        .sensor-row:not(:last-child) {
+            border-bottom: 1px solid rgba(255,255,255,0.03);
+        }
+
+        .sensor-label { 
+            font-size: 15px; 
+            color: var(--text-secondary); 
+        }
+
+        .sensor-val { 
+            font-family: 'Space Mono', monospace; 
+            font-size: 16px; 
+            font-weight: 700; 
+            transition: color 0.3s;
+        }
+
+        /* ==========================================================================
+           8. INTERACTIVE ELEMENTS
+           ========================================================================== */
+        .btn-primary {
+            margin-top: auto; /* Pushes button to bottom if screen is tall */
+            margin-bottom: 20px;
+            background: var(--text-primary);
+            color: var(--bg-base);
+            border: none;
+            border-radius: 30px;
+            padding: 20px 0;
+            width: 100%;
+            max-width: 480px;
+            font-family: 'Outfit', sans-serif;
+            font-size: 16px;
+            font-weight: 700;
+            letter-spacing: 1.5px;
+            text-transform: uppercase;
             cursor: pointer;
-            transition: all 0.3s ease;
-            box-shadow: 0 0 20px rgba(0, 242, 254, 0.1);
+            transition: var(--transition-fast);
+            box-shadow: 0 10px 20px rgba(255,255,255,0.1);
         }
 
-        #connectBtn:hover {
-            background: rgba(255, 255, 255, 0.1);
-            border-color: var(--color-safe);
-            box-shadow: 0 0 30px rgba(0, 242, 254, 0.3);
+        .btn-primary:active { 
+            transform: scale(0.97); 
+            box-shadow: 0 5px 10px rgba(255,255,255,0.05);
         }
 
-        #connectBtn:active { transform: scale(0.97); }
-
-        /* Dynamic Glow Classes */
-        .glow-safe { filter: drop-shadow(0 0 8px rgba(0, 242, 254, 0.5)); }
-        .glow-warn { filter: drop-shadow(0 0 12px rgba(245, 175, 25, 0.8)); }
-        .glow-danger { filter: drop-shadow(0 0 15px rgba(255, 8, 68, 1)); }
-
+        .btn-primary:disabled {
+            background: var(--text-tertiary);
+            color: rgba(255,255,255,0.5);
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
     </style>
 </head>
 <body>
 
     <header>
-        <h1>TITANIUM</h1>
-        <div id="statusText" class="status"><span class="pulse-dot"></span>System Offline</div>
+        <div class="brand-container">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+            </svg>
+            <h1>TITANIUM</h1>
+        </div>
+        <div id="statusBadge" class="status-badge">
+            <div id="statusDot" class="status-dot"></div>
+            <span id="statusText">System Offline</span>
+        </div>
     </header>
 
-    <div class="grid">
-        <div class="card">
-            <div class="card-title">Smoke</div>
-            <div class="gauge-container">
-                <svg class="gauge-svg" viewBox="0 0 100 100">
-                    <circle class="gauge-bg" cx="50" cy="50" r="40"></circle>
-                    <circle id="smokeRing" class="gauge-fill glow-safe" cx="50" cy="50" r="40"></circle>
+    <div id="diagnosticPanel">
+        <div class="diag-header">
+            <div class="diag-icon-wrapper">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="12" y1="8" x2="12" y2="12"></line>
+                    <line x1="12" y1="16" x2="12.01" y2="16"></line>
                 </svg>
-                <div class="gauge-data">
-                    <div id="smokeValue" class="value">0</div>
-                    <div class="unit">PPM</div>
-                </div>
+            </div>
+            <span id="diagTitle">Hardware Fault Detected</span>
+        </div>
+        <ul id="diagSteps" class="diag-list">
+            </ul>
+    </div>
+
+    <div class="core-grid">
+        <div class="metric-card">
+            <div class="metric-header">
+                <svg class="metric-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M14 14.76V3.5a2.5 2.5 0 0 0-5 0v11.26a4.5 4.5 0 1 0 5 0z"></path>
+                </svg>
+                <span class="metric-title">Core Temp</span>
+            </div>
+            <div class="metric-value-container">
+                <div id="tempValue" class="metric-value">--</div>
+                <div class="metric-unit">°C</div>
             </div>
         </div>
 
-        <div class="card">
-            <div class="card-title">Exhaust</div>
-            <div class="gauge-container">
-                <svg class="gauge-svg" viewBox="0 0 100 100">
-                    <circle class="gauge-bg" cx="50" cy="50" r="40"></circle>
-                    <circle id="gasRing" class="gauge-fill glow-safe" cx="50" cy="50" r="40"></circle>
+        <div class="metric-card">
+            <div class="metric-header">
+                <svg class="metric-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"></path>
                 </svg>
-                <div class="gauge-data">
-                    <div id="gasValue" class="value">0</div>
-                    <div class="unit">PPM</div>
-                </div>
+                <span class="metric-title">Humidity</span>
             </div>
-        </div>
-
-        <div class="card">
-            <div class="card-title">Core Temp</div>
-            <div class="gauge-container">
-                <svg class="gauge-svg" viewBox="0 0 100 100">
-                    <circle class="gauge-bg" cx="50" cy="50" r="40"></circle>
-                    <circle id="tempRing" class="gauge-fill" style="stroke: var(--color-warn);" cx="50" cy="50" r="40"></circle>
-                </svg>
-                <div class="gauge-data">
-                    <div id="tempValue" class="value">0</div>
-                    <div class="unit">°C</div>
-                </div>
-            </div>
-        </div>
-
-        <div class="card">
-            <div class="card-title">Humidity</div>
-            <div class="gauge-container">
-                <svg class="gauge-svg" viewBox="0 0 100 100">
-                    <circle class="gauge-bg" cx="50" cy="50" r="40"></circle>
-                    <circle id="humRing" class="gauge-fill" style="stroke: var(--color-eco);" cx="50" cy="50" r="40"></circle>
-                </svg>
-                <div class="gauge-data">
-                    <div id="humValue" class="value">0</div>
-                    <div class="unit">%</div>
-                </div>
+            <div class="metric-value-container">
+                <div id="humValue" class="metric-value">--</div>
+                <div class="metric-unit">%</div>
             </div>
         </div>
     </div>
 
-    <button id="connectBtn">Initialize Link</button>
+    <div id="safetyModule" class="safety-bar">
+        <div class="safety-header">
+            <div class="safety-title">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M9.59 4.59A2 2 0 1 1 11 8H2m10.59 11.41A2 2 0 1 0 14 16H2m15.73-8.27A2.5 2.5 0 1 1 19.5 12H2"></path>
+                </svg>
+                Air Purity
+            </div>
+            <div id="safetyStatus" class="safety-status">Unknown</div>
+        </div>
+        
+        <div class="sensor-row">
+            <div class="sensor-label">Particulates / Smoke</div>
+            <div id="smokeValue" class="sensor-val" style="color: var(--text-tertiary);">-- ppm</div>
+        </div>
+        <div class="sensor-row">
+            <div class="sensor-label">Exhaust / Combustibles</div>
+            <div id="gasValue" class="sensor-val" style="color: var(--text-tertiary);">-- ppm</div>
+        </div>
+    </div>
+
+    <button id="connectBtn" class="btn-primary">Initialize Link</button>
 
     <script>
-        const bleService = '6e400001-b5a3-f393-e0a9-e50e24dcca9e';
-        const bleCharacteristic = '6e400003-b5a3-f393-e0a9-e50e24dcca9e';
-        
-        let bluetoothDevice;
-        let bleBuffer = ""; 
-        
-        const connectBtn = document.getElementById('connectBtn');
-        const statusText = document.getElementById('statusText');
-        const header = document.querySelector('header');
-        
-        // Data Elements
-        const vals = {
+        /**
+         * TITANIUM E-BIKE TELEMETRY SYSTEM
+         * Architecture: Web Bluetooth API via Chrome Android
+         */
+
+        // --- CONSTANTS ---
+        const BLE_SERVICE_UUID = '6e400001-b5a3-f393-e0a9-e50e24dcca9e';
+        const BLE_RX_UUID      = '6e400003-b5a3-f393-e0a9-e50e24dcca9e';
+        const DEVICE_NAME      = 'EBike_Master';
+
+        // --- DOM ELEMENTS CACHE ---
+        const UI = {
+            btn: document.getElementById('connectBtn'),
+            statusTxt: document.getElementById('statusText'),
+            statusDot: document.getElementById('statusDot'),
+            statusBadge: document.getElementById('statusBadge'),
+            
+            temp: document.getElementById('tempValue'),
+            hum: document.getElementById('humValue'),
             smoke: document.getElementById('smokeValue'),
             gas: document.getElementById('gasValue'),
-            temp: document.getElementById('tempValue'),
-            hum: document.getElementById('humValue')
+            
+            safetyMod: document.getElementById('safetyModule'),
+            safetyStat: document.getElementById('safetyStatus'),
+            
+            diagPanel: document.getElementById('diagnosticPanel'),
+            diagTitle: document.getElementById('diagTitle'),
+            diagSteps: document.getElementById('diagSteps')
         };
 
-        // SVG Rings
-        const rings = {
-            smoke: document.getElementById('smokeRing'),
-            gas: document.getElementById('gasRing'),
-            temp: document.getElementById('tempRing'),
-            hum: document.getElementById('humRing')
-        };
+        // --- STATE VARIABLES ---
+        let bluetoothDevice = null;
+        let bleBuffer = ""; // Critical: Prevents MTU packet slicing errors
 
-        // Math for SVG Circles (Circumference = 2 * pi * r) r=40
-        const CIRCUMFERENCE = 251.2;
+        // --- EVENT LISTENERS ---
+        UI.btn.addEventListener('click', initializeConnection);
 
-        function updateGauge(ring, textElement, value, maxVal, isGas) {
-            // Update Text
-            textElement.innerText = value;
-
-            // Calculate how much of the ring to fill
-            let fillPercentage = Math.min(value / maxVal, 1);
-            let offset = CIRCUMFERENCE - (fillPercentage * CIRCUMFERENCE);
-            ring.style.strokeDashoffset = offset;
-
-            // Dynamic Styling for Gases
-            if (isGas) {
-                ring.classList.remove('glow-safe', 'glow-warn', 'glow-danger');
-                if (value < 50) {
-                    ring.style.stroke = 'var(--color-safe)';
-                    ring.classList.add('glow-safe');
-                    textElement.style.color = '#fff';
-                } else if (value < 200) {
-                    ring.style.stroke = 'var(--color-warn)';
-                    ring.classList.add('glow-warn');
-                    textElement.style.color = 'var(--color-warn)';
-                } else {
-                    ring.style.stroke = 'var(--color-danger)';
-                    ring.classList.add('glow-danger');
-                    textElement.style.color = 'var(--color-danger)';
-                }
-            }
-        }
-
-        connectBtn.addEventListener('click', async () => {
+        /**
+         * Initiates the Web Bluetooth request and handles the GATT server connection.
+         */
+        async function initializeConnection() {
             try {
+                // 1. Browser Capability Check
                 if (!navigator.bluetooth) {
-                    alert('Web Bluetooth requires Chrome on Android.');
+                    alert('CRITICAL ERROR: Web Bluetooth API not found. Please use Google Chrome on an Android device.');
                     return;
                 }
 
-                statusText.innerHTML = '<span class="pulse-dot"></span>Establishing Uplink...';
-                
+                // 2. Update UI to Scanning State
+                updateStatus('Scanning...', 'var(--status-warn)', true);
+                UI.btn.disabled = true;
+                UI.btn.innerText = "Searching for ESP32...";
+
+                // 3. Request Device Pairing
                 bluetoothDevice = await navigator.bluetooth.requestDevice({
-                    filters: [{ name: 'EBike_Master' }],
-                    optionalServices: [bleService]
+                    filters: [{ name: DEVICE_NAME }],
+                    optionalServices: [BLE_SERVICE_UUID]
                 });
 
-                bluetoothDevice.addEventListener('gattserverdisconnected', onDisconnected);
+                // Attach Disconnect Listener
+                bluetoothDevice.addEventListener('gattserverdisconnected', handleDisconnect);
 
+                // 4. Connect to GATT Server
+                updateStatus('Authenticating...', 'var(--status-info)', true);
                 const server = await bluetoothDevice.gatt.connect();
-                const service = await server.getPrimaryService(bleService);
-                const characteristic = await service.getCharacteristic(bleCharacteristic);
-
-                await characteristic.startNotifications();
-                characteristic.addEventListener('characteristicvaluechanged', handleData);
                 
-                // UI changes on connect
-                header.classList.add('connected');
-                statusText.innerHTML = '<span class="pulse-dot"></span>Live Telemetry Active';
-                connectBtn.style.display = 'none';
+                // 5. Connect to Service and Characteristic
+                const service = await server.getPrimaryService(BLE_SERVICE_UUID);
+                const characteristic = await service.getCharacteristic(BLE_RX_UUID);
+
+                // 6. Start Receiving Data stream
+                await characteristic.startNotifications();
+                characteristic.addEventListener('characteristicvaluechanged', processIncomingData);
+                
+                // 7. Update UI to Live State
+                updateStatus('Telemetry Live', 'var(--status-info)', true, true);
+                UI.btn.style.display = 'none';
 
             } catch (error) {
-                console.error(error);
-                statusText.innerHTML = '<span class="pulse-dot"></span>Connection Failed';
+                console.error("Connection Process Failed:", error);
+                handleDisconnect(); // Resets UI on failure or user cancellation
             }
-        });
+        }
 
-        function handleData(event) {
-            let chunk = new TextDecoder().decode(event.target.value);
+        /**
+         * Parses the raw byte stream from the ESP32.
+         * Utilizes a text buffer to stitch broken packets together.
+         */
+        function processIncomingData(event) {
+            // Decode the byte array into a string
+            const chunk = new TextDecoder().decode(event.target.value);
             bleBuffer += chunk;
             
+            // Only process if we have a complete line (terminated by \n)
             if (bleBuffer.includes('\n')) {
-                let lines = bleBuffer.split('\n');
-                let completeData = lines[0]; 
+                const lines = bleBuffer.split('\n');
+                const completeData = lines[0]; 
+                
+                // Retain any partial data for the next cycle
                 bleBuffer = lines[1] || ""; 
                 
-                let dataParts = completeData.trim().split(',');
+                const dataParts = completeData.trim().split(',');
                 
-                if(dataParts.length === 4) {
-                    let smoke = parseInt(dataParts[0]);
-                    let gas = parseInt(dataParts[1]);
-                    let temp = parseInt(dataParts[2]);
-                    let hum = parseInt(dataParts[3]);
-
-                    // Max Values for the rings: Smoke/Gas (1000 PPM), Temp (60C), Hum (100%)
-                    updateGauge(rings.smoke, vals.smoke, smoke, 1000, true);
-                    updateGauge(rings.gas, vals.gas, gas, 1000, true);
-                    updateGauge(rings.temp, vals.temp, temp, 60, false);
-                    updateGauge(rings.hum, vals.hum, hum, 100, false);
+                // Ensure payload integrity (Expecting 5 variables)
+                if(dataParts.length === 5) {
+                    const sensorData = {
+                        smoke: parseInt(dataParts[0], 10),
+                        gas: parseInt(dataParts[1], 10),
+                        temp: parseInt(dataParts[2], 10),
+                        hum: parseInt(dataParts[3], 10),
+                        errorCode: parseInt(dataParts[4], 10)
+                    };
+                    updateDashboard(sensorData);
                 }
             }
         }
 
-        function onDisconnected() {
-            header.classList.remove('connected');
-            statusText.innerHTML = '<span class="pulse-dot"></span>Connection Lost';
-            connectBtn.style.display = 'block';
-            connectBtn.innerText = "Reconnect System";
-            bleBuffer = ""; 
+        /**
+         * Routes data to the UI and triggers aesthetic state changes.
+         */
+        function updateDashboard(data) {
+            // --- DIAGNOSTIC ENGINE ROUTING ---
+            if (data.errorCode !== 0) {
+                triggerDiagnosticMode(data.errorCode);
+                return; // Halt standard updates if hardware is failing
+            } else {
+                UI.diagPanel.style.display = 'none'; // Hide if previously showing
+            }
+
+            // --- CORE METRICS UPDATE ---
+            UI.temp.innerText = data.temp;
+            UI.hum.innerText = data.hum;
             
-            // Reset rings
-            updateGauge(rings.smoke, vals.smoke, 0, 1000, true);
-            updateGauge(rings.gas, vals.gas, 0, 1000, true);
-            updateGauge(rings.temp, vals.temp, 0, 60, false);
-            updateGauge(rings.hum, vals.hum, 0, 100, false);
+            // Visual feedback for excessive heat (> 40C)
+            UI.temp.style.color = data.temp > 40 ? 'var(--status-warn)' : 'var(--text-primary)';
+
+            // --- SAFETY MODULE UPDATE ---
+            UI.smoke.innerText = `${data.smoke} ppm`;
+            UI.gas.innerText = `${data.gas} ppm`;
+
+            // Calculate peak danger level
+            const peakGas = Math.max(data.smoke, data.gas);
+            
+            if (peakGas < 80) {
+                // STATE: OPTIMAL
+                UI.safetyMod.style.borderColor = 'rgba(0, 230, 163, 0.3)';
+                UI.safetyMod.style.boxShadow = 'var(--glow-safe)';
+                UI.safetyStat.innerText = 'Optimal';
+                UI.safetyStat.style.color = 'var(--status-safe)';
+                UI.safetyStat.style.background = 'rgba(0, 230, 163, 0.1)';
+                UI.smoke.style.color = 'var(--status-safe)';
+                UI.gas.style.color = 'var(--status-safe)';
+            } 
+            else if (peakGas < 200) {
+                // STATE: ELEVATED (WARNING)
+                UI.safetyMod.style.borderColor = 'var(--status-warn)';
+                UI.safetyMod.style.boxShadow = 'var(--glow-warn)';
+                UI.safetyStat.innerText = 'Elevated';
+                UI.safetyStat.style.color = 'var(--status-warn)';
+                UI.safetyStat.style.background = 'rgba(255, 159, 10, 0.1)';
+                UI.smoke.style.color = data.smoke >= 80 ? 'var(--status-warn)' : 'var(--status-safe)';
+                UI.gas.style.color = data.gas >= 80 ? 'var(--status-warn)' : 'var(--status-safe)';
+            } 
+            else {
+                // STATE: HAZARD (DANGER)
+                UI.safetyMod.style.borderColor = 'var(--status-danger)';
+                UI.safetyMod.style.boxShadow = 'var(--glow-danger)';
+                UI.safetyStat.innerText = 'HAZARD';
+                UI.safetyStat.style.color = 'var(--status-danger)';
+                UI.safetyStat.style.background = 'rgba(255, 55, 95, 0.1)';
+                UI.smoke.style.color = data.smoke >= 200 ? 'var(--status-danger)' : 'var(--status-safe)';
+                UI.gas.style.color = data.gas >= 200 ? 'var(--status-danger)' : 'var(--status-safe)';
+            }
         }
+
+        /**
+         * Handles Hardware Faults sent from the ESP32
+         */
+        function triggerDiagnosticMode(errorCode) {
+            UI.diagPanel.style.display = 'block';
+            
+            // Mask live numbers during failure
+            UI.smoke.innerText = 'FAULT';
+            UI.gas.innerText = 'FAULT';
+            UI.temp.innerText = '--';
+            UI.hum.innerText = '--';
+
+            if (errorCode === 1) {
+                UI.diagTitle.innerText = "Sensor Matrix Offline (MQ-2)";
+                UI.diagSteps.innerHTML = `
+                    <li>Check <span class="diag-highlight">VIN (5V)</span> and <span class="diag-highlight">GND</span> physical headers.</li>
+                    <li>Verify Analog Data wire is firmly seated in <span class="diag-highlight">GPIO 35</span>.</li>
+                    <li>Inspect the 10k/20k voltage divider resistors for vibration damage.</li>
+                `;
+            } else if (errorCode === 2) {
+                UI.diagTitle.innerText = "Climate Subsystem Offline (DHT22)";
+                UI.diagSteps.innerHTML = `
+                    <li>Check <span class="diag-highlight">3.3V Power</span> routing to the DHT sensor.</li>
+                    <li>Verify Digital Data wire is firmly seated in <span class="diag-highlight">GPIO 32</span>.</li>
+                    <li>Check for pinched jumper cables near the handlebar mount.</li>
+                `;
+            } else {
+                UI.diagTitle.innerText = `Unknown Fault Code: ${errorCode}`;
+                UI.diagSteps.innerHTML = `<li>Reboot ESP32 Master Controller.</li>`;
+            }
+        }
+
+        /**
+         * Cleans up the UI when connection is lost or user cancels.
+         */
+        function handleDisconnect() {
+            updateStatus('System Offline', 'var(--text-tertiary)', false, false);
+            
+            UI.btn.style.display = 'block';
+            UI.btn.disabled = false;
+            UI.btn.innerText = "Reconnect Link";
+            
+            bleBuffer = ""; // Flush memory
+            UI.diagPanel.style.display = 'none'; 
+            
+            // Reset Data
+            UI.temp.innerText = '--';
+            UI.hum.innerText = '--';
+            UI.smoke.innerText = '-- ppm';
+            UI.gas.innerText = '-- ppm';
+            
+            // Reset Safety Module Aesthetics
+            UI.safetyMod.style.borderColor = 'var(--surface-border)';
+            UI.safetyMod.style.boxShadow = 'var(--shadow-elevation)';
+            UI.safetyStat.innerText = 'Unknown';
+            UI.safetyStat.style.color = 'var(--text-tertiary)';
+            UI.safetyStat.style.background = 'transparent';
+            UI.smoke.style.color = 'var(--text-tertiary)';
+            UI.gas.style.color = 'var(--text-tertiary)';
+        }
+
+        /**
+         * Helper utility for updating the top status badge.
+         */
+        function updateStatus(text, color, isPulsing, isConnected = false) {
+            UI.statusTxt.innerText = text;
+            UI.statusDot.style.background = color;
+            UI.statusBadge.style.borderColor = isConnected ? 'rgba(10, 132, 255, 0.4)' : 'var(--surface-border)';
+            
+            if (isPulsing) {
+                UI.statusDot.classList.add('pulsing');
+            } else {
+                UI.statusDot.classList.remove('pulsing');
+            }
+        }
+
     </script>
 </body>
 </html>
