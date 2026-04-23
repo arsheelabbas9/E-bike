@@ -167,10 +167,20 @@
             color: #fff;
             width: 28px;
             height: 28px;
+            flex-shrink: 0;
             display: flex;
             justify-content: center;
             align-items: center;
             border-radius: 50%;
+        }
+
+        .diag-fix-label {
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            color: rgba(255, 55, 95, 0.7);
+            font-weight: 700;
+            margin-bottom: 10px;
         }
 
         .diag-list {
@@ -182,10 +192,11 @@
         }
 
         .diag-list li { margin-bottom: 8px; }
-        .diag-highlight { 
-            color: #fff; 
-            font-weight: 700; 
-            font-family: 'Space Mono', monospace; 
+
+        .diag-highlight {
+            color: #fff;
+            font-weight: 700;
+            font-family: 'Space Mono', monospace;
             background: rgba(255,255,255,0.1);
             padding: 2px 6px;
             border-radius: 4px;
@@ -216,9 +227,16 @@
             box-shadow: var(--shadow-elevation);
             position: relative;
             overflow: hidden;
+            transition: var(--transition-smooth);
         }
 
-        /* Subtle lighting effect on cards */
+        /* Faulted metric card glows red to pinpoint the offline sensor */
+        .metric-card.faulted {
+            border-color: rgba(255, 55, 95, 0.45);
+            box-shadow: var(--glow-danger);
+        }
+
+        /* Subtle top lighting shimmer effect on all cards */
         .metric-card::before {
             content: '';
             position: absolute;
@@ -265,6 +283,26 @@
             font-size: 18px;
             color: var(--text-secondary);
             font-weight: 500;
+        }
+
+        /* Small fault pill shown inside a metric card when its sensor has failed */
+        .metric-fault-badge {
+            display: none;
+            font-size: 10px;
+            font-weight: 700;
+            font-family: 'Space Mono', monospace;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--status-danger);
+            background: rgba(255, 55, 95, 0.12);
+            border: 1px solid rgba(255, 55, 95, 0.3);
+            padding: 3px 8px;
+            border-radius: 20px;
+            margin-top: 8px;
+        }
+
+        .metric-fault-badge.visible {
+            display: block;
         }
 
         /* ==========================================================================
@@ -327,24 +365,26 @@
             border-bottom: 1px solid rgba(255,255,255,0.03);
         }
 
-        .sensor-label { 
-            font-size: 15px; 
-            color: var(--text-secondary); 
+        .sensor-label {
+            font-size: 15px;
+            color: var(--text-secondary);
         }
 
-        .sensor-val { 
-            font-family: 'Space Mono', monospace; 
-            font-size: 16px; 
-            font-weight: 700; 
+        .sensor-val {
+            font-family: 'Space Mono', monospace;
+            font-size: 16px;
+            font-weight: 700;
             transition: color 0.3s;
         }
 
         /* ==========================================================================
-           8. INTERACTIVE ELEMENTS
+           8. INTERACTIVE ELEMENTS — PRIMARY CONNECT & DANGER DISCONNECT BUTTONS
            ========================================================================== */
+
+        /* Primary connect/reconnect button */
         .btn-primary {
             margin-top: 25px;
-            margin-bottom: 20px;
+            margin-bottom: 0;
             background: var(--text-primary);
             color: var(--bg-base);
             border: none;
@@ -362,8 +402,8 @@
             box-shadow: 0 10px 20px rgba(255,255,255,0.1);
         }
 
-        .btn-primary:active { 
-            transform: scale(0.97); 
+        .btn-primary:active {
+            transform: scale(0.97);
             box-shadow: 0 5px 10px rgba(255,255,255,0.05);
         }
 
@@ -374,13 +414,55 @@
             transform: none;
             box-shadow: none;
         }
+
+        /* Disconnect button — transparent with danger border, only visible when connected */
+        .btn-disconnect {
+            display: none;
+            margin-top: 14px;
+            margin-bottom: 0;
+            background: transparent;
+            color: var(--status-danger);
+            border: 1px solid rgba(255, 55, 95, 0.4);
+            border-radius: 30px;
+            padding: 16px 0;
+            width: 100%;
+            max-width: 480px;
+            font-family: 'Outfit', sans-serif;
+            font-size: 15px;
+            font-weight: 600;
+            letter-spacing: 1.5px;
+            text-transform: uppercase;
+            cursor: pointer;
+            transition: var(--transition-fast);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+        }
+
+        .btn-disconnect:active {
+            background: rgba(255, 55, 95, 0.08);
+            transform: scale(0.97);
+        }
+
+        .btn-disconnect:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        /* Footer breathing room at the bottom of the page */
+        .page-footer-spacer {
+            height: 30px;
+            width: 100%;
+            flex-shrink: 0;
+        }
+
     </style>
 </head>
 <body>
 
     <header>
         <div class="brand-container">
-            <!-- E-Bike / Bicycle icon -->
+            <!-- E-Bike / Bicycle SVG icon -->
             <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
                 <circle cx="5.5" cy="17.5" r="3.5"></circle>
                 <circle cx="18.5" cy="17.5" r="3.5"></circle>
@@ -389,7 +471,7 @@
                 <path d="M5.5 17.5L9 9h5l3 8.5"></path>
                 <path d="M12 6h3"></path>
             </svg>
-            <h1>E-Bike </h1>
+            <h1>E-Bike</h1>
         </div>
         <div id="statusBadge" class="status-badge">
             <div id="statusDot" class="status-dot"></div>
@@ -397,6 +479,11 @@
         </div>
     </header>
 
+    <!-- =====================================================================
+         DIAGNOSTIC PANEL
+         Appears on any hardware fault (errorCode != 0) sent from the ESP32.
+         Shows the specific sensor that failed and targeted fix steps.
+         ===================================================================== -->
     <div id="diagnosticPanel">
         <div class="diag-header">
             <div class="diag-icon-wrapper">
@@ -407,12 +494,16 @@
             </div>
             <span id="diagTitle">Hardware Fault Detected</span>
         </div>
-        <ul id="diagSteps" class="diag-list">
-            </ul>
+        <div class="diag-fix-label">&#9881; Troubleshooting Steps</div>
+        <ul id="diagSteps" class="diag-list"></ul>
     </div>
 
+    <!-- =====================================================================
+         CORE METRICS GRID — Temperature & Humidity
+         Each card has a hidden fault badge that appears when that sensor fails.
+         ===================================================================== -->
     <div class="core-grid">
-        <div class="metric-card">
+        <div class="metric-card" id="tempCard">
             <div class="metric-header">
                 <svg class="metric-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M14 14.76V3.5a2.5 2.5 0 0 0-5 0v11.26a4.5 4.5 0 1 0 5 0z"></path>
@@ -423,9 +514,10 @@
                 <div id="tempValue" class="metric-value">--</div>
                 <div class="metric-unit">°C</div>
             </div>
+            <div id="tempFaultBadge" class="metric-fault-badge">Offline</div>
         </div>
 
-        <div class="metric-card">
+        <div class="metric-card" id="humCard">
             <div class="metric-header">
                 <svg class="metric-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"></path>
@@ -436,9 +528,13 @@
                 <div id="humValue" class="metric-value">--</div>
                 <div class="metric-unit">%</div>
             </div>
+            <div id="humFaultBadge" class="metric-fault-badge">Offline</div>
         </div>
     </div>
 
+    <!-- =====================================================================
+         ACTIVE SAFETY MODULE — Air Purity / Gas Sensor
+         ===================================================================== -->
     <div id="safetyModule" class="safety-bar">
         <div class="safety-header">
             <div class="safety-title">
@@ -449,7 +545,7 @@
             </div>
             <div id="safetyStatus" class="safety-status">Unknown</div>
         </div>
-        
+
         <div class="sensor-row">
             <div class="sensor-label">Particulates / Smoke</div>
             <div id="smokeValue" class="sensor-val" style="color: var(--text-tertiary);">-- ppm</div>
@@ -460,12 +556,32 @@
         </div>
     </div>
 
+    <!-- =====================================================================
+         ACTION BUTTONS
+         Connect button shows when offline. Disconnect button shows when live.
+         ===================================================================== -->
     <button id="connectBtn" class="btn-primary">Connect to Device</button>
+    <button id="disconnectBtn" class="btn-disconnect">&#x2715;&nbsp;&nbsp;Disconnect Device</button>
+
+    <div class="page-footer-spacer"></div>
 
     <script>
         /**
          * E-Bike Dashboard
          * Architecture: Web Bluetooth API via Chrome Android
+         *
+         * BLE Data Protocol (from ESP32 firmware):
+         *   Format: "smoke,gas,temp,hum,errorCode\n"
+         *   errorCode 0 = All systems nominal
+         *   errorCode 1 = MQ-2 gas/smoke sensor offline (rawRs == 0)
+         *   errorCode 2 = DHT22 climate sensor offline (consecutive read failures)
+         *
+         * IMPORTANT — DHT22 Fault Detection (firmware fix required):
+         *   The original firmware checked isnan(currentHum) which is ALWAYS false
+         *   because currentHum is initialized to 65.0 and only updated on success.
+         *   The fixed firmware uses a persistent boolean `dhtFault` flag that is set
+         *   when the local DHT read returns NaN, making errorCode 2 actually transmit.
+         *   See the companion .ino file for the corrected firmware.
          */
 
         // --- CONSTANTS ---
@@ -475,30 +591,37 @@
 
         // --- DOM ELEMENTS CACHE ---
         const UI = {
-            btn: document.getElementById('connectBtn'),
-            statusTxt: document.getElementById('statusText'),
-            statusDot: document.getElementById('statusDot'),
-            statusBadge: document.getElementById('statusBadge'),
-            
-            temp: document.getElementById('tempValue'),
-            hum: document.getElementById('humValue'),
-            smoke: document.getElementById('smokeValue'),
-            gas: document.getElementById('gasValue'),
-            
-            safetyMod: document.getElementById('safetyModule'),
-            safetyStat: document.getElementById('safetyStatus'),
-            
-            diagPanel: document.getElementById('diagnosticPanel'),
-            diagTitle: document.getElementById('diagTitle'),
-            diagSteps: document.getElementById('diagSteps')
+            connectBtn:     document.getElementById('connectBtn'),
+            disconnectBtn:  document.getElementById('disconnectBtn'),
+            statusTxt:      document.getElementById('statusText'),
+            statusDot:      document.getElementById('statusDot'),
+            statusBadge:    document.getElementById('statusBadge'),
+
+            temp:           document.getElementById('tempValue'),
+            hum:            document.getElementById('humValue'),
+            smoke:          document.getElementById('smokeValue'),
+            gas:            document.getElementById('gasValue'),
+
+            tempCard:       document.getElementById('tempCard'),
+            humCard:        document.getElementById('humCard'),
+            tempFaultBadge: document.getElementById('tempFaultBadge'),
+            humFaultBadge:  document.getElementById('humFaultBadge'),
+
+            safetyMod:      document.getElementById('safetyModule'),
+            safetyStat:     document.getElementById('safetyStatus'),
+
+            diagPanel:      document.getElementById('diagnosticPanel'),
+            diagTitle:      document.getElementById('diagTitle'),
+            diagSteps:      document.getElementById('diagSteps')
         };
 
         // --- STATE VARIABLES ---
         let bluetoothDevice = null;
-        let bleBuffer = ""; // Critical: Prevents MTU packet slicing errors
+        let bleBuffer = ""; // Critical: prevents MTU packet slicing errors
 
         // --- EVENT LISTENERS ---
-        UI.btn.addEventListener('click', initializeConnection);
+        UI.connectBtn.addEventListener('click', initializeConnection);
+        UI.disconnectBtn.addEventListener('click', triggerManualDisconnect);
 
         /**
          * Initiates the Web Bluetooth request and handles the GATT server connection.
@@ -513,33 +636,34 @@
 
                 // 2. Update UI to Scanning State
                 updateStatus('Scanning...', 'var(--status-warn)', true);
-                UI.btn.disabled = true;
-                UI.btn.innerText = "Searching for ESP32...";
+                UI.connectBtn.disabled = true;
+                UI.connectBtn.innerText = "Searching for ESP32...";
 
-                // 3. Request Device Pairing
+                // 3. Request Device Pairing via browser native dialog
                 bluetoothDevice = await navigator.bluetooth.requestDevice({
                     filters: [{ name: DEVICE_NAME }],
                     optionalServices: [BLE_SERVICE_UUID]
                 });
 
-                // Attach Disconnect Listener
+                // Attach disconnect handler — fires on both manual and signal-loss events
                 bluetoothDevice.addEventListener('gattserverdisconnected', handleDisconnect);
 
                 // 4. Connect to GATT Server
                 updateStatus('Authenticating...', 'var(--status-info)', true);
                 const server = await bluetoothDevice.gatt.connect();
-                
+
                 // 5. Connect to Service and Characteristic
                 const service = await server.getPrimaryService(BLE_SERVICE_UUID);
                 const characteristic = await service.getCharacteristic(BLE_RX_UUID);
 
-                // 6. Start Receiving Data stream
+                // 6. Start Receiving Data stream via BLE notifications
                 await characteristic.startNotifications();
                 characteristic.addEventListener('characteristicvaluechanged', processIncomingData);
-                
-                // 7. Update UI to Live State
+
+                // 7. Update UI to Live Connected State
                 updateStatus('Telemetry Live', 'var(--status-info)', true, true);
-                UI.btn.style.display = 'none';
+                UI.connectBtn.style.display    = 'none';
+                UI.disconnectBtn.style.display = 'block';
 
             } catch (error) {
                 console.error("Connection Process Failed:", error);
@@ -548,31 +672,50 @@
         }
 
         /**
+         * Called when the user taps the Disconnect button.
+         * Calls gatt.disconnect() which fires 'gattserverdisconnected',
+         * which in turn calls handleDisconnect() to reset the full UI.
+         */
+        function triggerManualDisconnect() {
+            if (bluetoothDevice && bluetoothDevice.gatt.connected) {
+                updateStatus('Disconnecting...', 'var(--status-warn)', true);
+                UI.disconnectBtn.disabled = true;
+                UI.disconnectBtn.innerText = "Disconnecting...";
+                bluetoothDevice.gatt.disconnect();
+                // UI cleanup happens automatically via gattserverdisconnected → handleDisconnect()
+            } else {
+                handleDisconnect(); // Device already gone, clean up immediately
+            }
+        }
+
+        /**
          * Parses the raw byte stream from the ESP32.
-         * Utilizes a text buffer to stitch broken packets together.
+         * Uses a persistent text buffer to stitch together BLE packets that have
+         * been fragmented by the MTU limit — prevents data corruption on long rides.
          */
         function processIncomingData(event) {
-            // Decode the byte array into a string
+            // Decode the incoming byte array into a UTF-8 string chunk
             const chunk = new TextDecoder().decode(event.target.value);
             bleBuffer += chunk;
-            
-            // Only process if we have a complete line (terminated by \n)
+
+            // Only process when we have a complete newline-terminated packet
             if (bleBuffer.includes('\n')) {
-                const lines = bleBuffer.split('\n');
-                const completeData = lines[0]; 
-                
-                // Retain any partial data for the next cycle
-                bleBuffer = lines[1] || ""; 
-                
+                const lines       = bleBuffer.split('\n');
+                const completeData = lines[0];
+
+                // Retain any partial data beyond the newline for the next incoming cycle
+                bleBuffer = lines[1] || "";
+
                 const dataParts = completeData.trim().split(',');
-                
-                // Ensure payload integrity (Expecting 5 variables)
-                if(dataParts.length === 5) {
+
+                // Validate payload integrity — firmware sends exactly 5 comma-separated fields:
+                // [smoke, gas, temp, hum, errorCode]
+                if (dataParts.length === 5) {
                     const sensorData = {
-                        smoke: parseInt(dataParts[0], 10),
-                        gas: parseInt(dataParts[1], 10),
-                        temp: parseInt(dataParts[2], 10),
-                        hum: parseInt(dataParts[3], 10),
+                        smoke:     parseInt(dataParts[0], 10),
+                        gas:       parseInt(dataParts[1], 10),
+                        temp:      parseInt(dataParts[2], 10),
+                        hum:       parseInt(dataParts[3], 10),
                         errorCode: parseInt(dataParts[4], 10)
                     };
                     updateDashboard(sensorData);
@@ -581,132 +724,237 @@
         }
 
         /**
-         * Routes data to the UI and triggers aesthetic state changes.
+         * Routes sensor data to the UI and triggers all visual state changes.
          */
         function updateDashboard(data) {
             // --- DIAGNOSTIC ENGINE ROUTING ---
+            // Any non-zero errorCode means a hardware subsystem has failed.
             if (data.errorCode !== 0) {
-                triggerDiagnosticMode(data.errorCode);
-                return; // Halt standard updates if hardware is failing
-            } else {
-                UI.diagPanel.style.display = 'none'; // Hide if previously showing
+                triggerDiagnosticMode(data.errorCode, data);
+                return; // Do not update metrics normally during a hardware fault
             }
+
+            // --- CLEAR ANY PREVIOUS FAULT VISUAL STATE ---
+            clearDiagnosticState();
 
             // --- CORE METRICS UPDATE ---
             UI.temp.innerText = data.temp;
-            UI.hum.innerText = data.hum;
-            
-            // Visual feedback for excessive heat (> 40C)
+            UI.hum.innerText  = data.hum;
+
+            // Highlight temperature orange if it exceeds the 40°C thermal threshold
             UI.temp.style.color = data.temp > 40 ? 'var(--status-warn)' : 'var(--text-primary)';
+            UI.hum.style.color  = 'var(--text-primary)';
 
             // --- SAFETY MODULE UPDATE ---
             UI.smoke.innerText = `${data.smoke} ppm`;
-            UI.gas.innerText = `${data.gas} ppm`;
+            UI.gas.innerText   = `${data.gas} ppm`;
 
-            // Calculate peak danger level
+            // Use the single highest reading as the master danger level for the panel
             const peakGas = Math.max(data.smoke, data.gas);
-            
+
             if (peakGas < 80) {
-                // STATE: OPTIMAL
+                // STATE: OPTIMAL — all readings within safe range
                 UI.safetyMod.style.borderColor = 'rgba(0, 230, 163, 0.3)';
-                UI.safetyMod.style.boxShadow = 'var(--glow-safe)';
-                UI.safetyStat.innerText = 'Optimal';
-                UI.safetyStat.style.color = 'var(--status-safe)';
-                UI.safetyStat.style.background = 'rgba(0, 230, 163, 0.1)';
-                UI.smoke.style.color = 'var(--status-safe)';
-                UI.gas.style.color = 'var(--status-safe)';
-            } 
+                UI.safetyMod.style.boxShadow   = 'var(--glow-safe)';
+                UI.safetyStat.innerText         = 'Optimal';
+                UI.safetyStat.style.color       = 'var(--status-safe)';
+                UI.safetyStat.style.background  = 'rgba(0, 230, 163, 0.1)';
+                UI.smoke.style.color            = 'var(--status-safe)';
+                UI.gas.style.color              = 'var(--status-safe)';
+            }
             else if (peakGas < 200) {
-                // STATE: ELEVATED (WARNING)
+                // STATE: ELEVATED — one or both readings in the warning zone
                 UI.safetyMod.style.borderColor = 'var(--status-warn)';
-                UI.safetyMod.style.boxShadow = 'var(--glow-warn)';
-                UI.safetyStat.innerText = 'Elevated';
-                UI.safetyStat.style.color = 'var(--status-warn)';
-                UI.safetyStat.style.background = 'rgba(255, 159, 10, 0.1)';
+                UI.safetyMod.style.boxShadow   = 'var(--glow-warn)';
+                UI.safetyStat.innerText         = 'Elevated';
+                UI.safetyStat.style.color       = 'var(--status-warn)';
+                UI.safetyStat.style.background  = 'rgba(255, 159, 10, 0.1)';
                 UI.smoke.style.color = data.smoke >= 80 ? 'var(--status-warn)' : 'var(--status-safe)';
-                UI.gas.style.color = data.gas >= 80 ? 'var(--status-warn)' : 'var(--status-safe)';
-            } 
+                UI.gas.style.color   = data.gas   >= 80 ? 'var(--status-warn)' : 'var(--status-safe)';
+            }
             else {
-                // STATE: HAZARD (DANGER)
+                // STATE: HAZARD — critical danger level detected, immediate action needed
                 UI.safetyMod.style.borderColor = 'var(--status-danger)';
-                UI.safetyMod.style.boxShadow = 'var(--glow-danger)';
-                UI.safetyStat.innerText = 'HAZARD';
-                UI.safetyStat.style.color = 'var(--status-danger)';
-                UI.safetyStat.style.background = 'rgba(255, 55, 95, 0.1)';
+                UI.safetyMod.style.boxShadow   = 'var(--glow-danger)';
+                UI.safetyStat.innerText         = 'HAZARD';
+                UI.safetyStat.style.color       = 'var(--status-danger)';
+                UI.safetyStat.style.background  = 'rgba(255, 55, 95, 0.1)';
                 UI.smoke.style.color = data.smoke >= 200 ? 'var(--status-danger)' : 'var(--status-safe)';
-                UI.gas.style.color = data.gas >= 200 ? 'var(--status-danger)' : 'var(--status-safe)';
+                UI.gas.style.color   = data.gas   >= 200 ? 'var(--status-danger)' : 'var(--status-safe)';
             }
         }
 
         /**
-         * Handles Hardware Faults sent from the ESP32
+         * Handles hardware faults received from the ESP32.
+         *
+         * errorCode 1 — MQ-2 gas/smoke sensor is offline.
+         *   Gas readings are invalid. DHT22 temp/hum readings may still be valid.
+         *   Only the Air Purity panel is faulted; temp/hum cards remain usable.
+         *
+         * errorCode 2 — DHT22 climate sensor is offline.
+         *   The ESP32 sends cached temp/hum (20°C / 65%) which look valid but are stale.
+         *   We MUST mask those values and flag the temp/hum cards so the rider is not misled.
+         *   Gas readings from MQ-2 may still be valid and are kept live.
+         *
+         * Both cases: show the diagnostic panel with specific wiring troubleshooting steps.
          */
-        function triggerDiagnosticMode(errorCode) {
+        function triggerDiagnosticMode(errorCode, data) {
+            // Always show the alert panel for any non-zero error code
             UI.diagPanel.style.display = 'block';
-            
-            // Mask live numbers during failure
-            UI.smoke.innerText = 'FAULT';
-            UI.gas.innerText = 'FAULT';
-            UI.temp.innerText = '--';
-            UI.hum.innerText = '--';
 
             if (errorCode === 1) {
-                UI.diagTitle.innerText = "Sensor Matrix Offline (MQ-2)";
+                // --- MQ-2 GAS SENSOR FAULT ---
+                // Mask gas readings as they come from the failed sensor
+                UI.smoke.innerText   = 'FAULT';
+                UI.gas.innerText     = 'FAULT';
+                UI.smoke.style.color = 'var(--status-danger)';
+                UI.gas.style.color   = 'var(--status-danger)';
+
+                // DHT22 is still operational — show its last-known readings in a dimmed state
+                if (data) {
+                    UI.temp.innerText   = data.temp;
+                    UI.hum.innerText    = data.hum;
+                    UI.temp.style.color = 'var(--text-secondary)';
+                    UI.hum.style.color  = 'var(--text-secondary)';
+                }
+
+                // Mark the air purity panel as faulted
+                UI.safetyMod.style.borderColor = 'var(--status-danger)';
+                UI.safetyMod.style.boxShadow   = 'var(--glow-danger)';
+                UI.safetyStat.innerText         = 'SENSOR FAULT';
+                UI.safetyStat.style.color       = 'var(--status-danger)';
+                UI.safetyStat.style.background  = 'rgba(255, 55, 95, 0.1)';
+
+                // Temp and humidity cards are NOT affected — clear any previous fault state on them
+                UI.tempCard.classList.remove('faulted');
+                UI.humCard.classList.remove('faulted');
+                UI.tempFaultBadge.classList.remove('visible');
+                UI.humFaultBadge.classList.remove('visible');
+
+                // Populate the diagnostic panel with MQ-2 specific wiring troubleshooting steps
+                UI.diagTitle.innerText = "Gas Sensor Offline \u2014 MQ-2";
                 UI.diagSteps.innerHTML = `
-                    <li>Check <span class="diag-highlight">VIN (5V)</span> and <span class="diag-highlight">GND</span> physical headers.</li>
-                    <li>Verify Analog Data wire is firmly seated in <span class="diag-highlight">GPIO 35</span>.</li>
-                    <li>Inspect the 10k/20k voltage divider resistors for vibration damage.</li>
+                    <li>Check the <span class="diag-highlight">VIN (5V)</span> and <span class="diag-highlight">GND</span> wires at the MQ-2 sensor header — vibration can loosen these.</li>
+                    <li>Verify the analog data wire is firmly seated on <span class="diag-highlight">GPIO 35</span> of the ESP32.</li>
+                    <li>Inspect the <span class="diag-highlight">10k&Omega; / 20k&Omega;</span> voltage divider resistors for vibration damage or cold solder joints.</li>
+                    <li>Confirm the MQ-2 module's onboard power LED is lit. No LED means no power is reaching the module.</li>
+                    <li>If recently installed, allow <span class="diag-highlight">24&ndash;48 hours</span> of warm-up time for the heating element to calibrate.</li>
                 `;
+
             } else if (errorCode === 2) {
-                UI.diagTitle.innerText = "Climate Subsystem Offline (DHT22)";
+                // --- DHT22 CLIMATE SENSOR FAULT ---
+                // The ESP32 sends stale cached values for temp and hum when DHT22 fails.
+                // We MUST display dashes and flag the cards so the rider is not misled.
+                UI.temp.innerText   = '--';
+                UI.hum.innerText    = '--';
+                UI.temp.style.color = 'var(--status-danger)';
+                UI.hum.style.color  = 'var(--status-danger)';
+
+                // Visually flag the affected metric cards with red border and offline badge
+                UI.tempCard.classList.add('faulted');
+                UI.humCard.classList.add('faulted');
+                UI.tempFaultBadge.classList.add('visible');
+                UI.humFaultBadge.classList.add('visible');
+
+                // MQ-2 is still operational — keep gas readings live if data was provided
+                if (data) {
+                    UI.smoke.innerText = `${data.smoke} ppm`;
+                    UI.gas.innerText   = `${data.gas} ppm`;
+                }
+
+                // Populate the diagnostic panel with DHT22 specific wiring troubleshooting steps
+                UI.diagTitle.innerText = "Climate Sensor Offline \u2014 DHT22";
                 UI.diagSteps.innerHTML = `
-                    <li>Check <span class="diag-highlight">3.3V Power</span> routing to the DHT sensor.</li>
-                    <li>Verify Digital Data wire is firmly seated in <span class="diag-highlight">GPIO 32</span>.</li>
-                    <li>Check for pinched jumper cables near the handlebar mount.</li>
+                    <li>Check the <span class="diag-highlight">3.3V Power</span> and <span class="diag-highlight">GND</span> wires at the DHT22 — confirm with a multimeter if unsure.</li>
+                    <li>Verify the digital data wire is firmly seated on <span class="diag-highlight">GPIO 32</span> of the ESP32.</li>
+                    <li>Inspect for pinched or broken jumper cables near the <span class="diag-highlight">handlebar mount</span> — the most common failure point from vibration.</li>
+                    <li>Confirm the <span class="diag-highlight">10k&Omega; pull-up resistor</span> is wired between the data pin and 3.3V — the DHT22 requires it to function.</li>
+                    <li>If wiring checks out, the DHT22 module may need replacing — these sensors fail permanently when shorted, even briefly.</li>
                 `;
+
             } else {
-                UI.diagTitle.innerText = `Unknown Fault Code: ${errorCode}`;
-                UI.diagSteps.innerHTML = `<li>Reboot ESP32 Master Controller.</li>`;
+                // --- UNKNOWN FAULT CODE ---
+                UI.smoke.innerText   = 'FAULT';
+                UI.gas.innerText     = 'FAULT';
+                UI.temp.innerText    = '--';
+                UI.hum.innerText     = '--';
+                UI.smoke.style.color = 'var(--status-danger)';
+                UI.gas.style.color   = 'var(--status-danger)';
+                UI.temp.style.color  = 'var(--status-danger)';
+                UI.hum.style.color   = 'var(--status-danger)';
+
+                UI.diagTitle.innerText = `Unknown Fault \u2014 Error Code: ${errorCode}`;
+                UI.diagSteps.innerHTML = `
+                    <li>Reboot the ESP32 master controller and wait 15 seconds for all sensors to warm up.</li>
+                    <li>If the fault persists, connect a USB cable and open Serial Monitor at <span class="diag-highlight">115200 baud</span> for detailed debug output.</li>
+                `;
             }
         }
 
         /**
-         * Cleans up the UI when connection is lost or user cancels.
+         * Clears all fault-state visual indicators back to their default appearance.
+         * Called when errorCode returns to 0 (all sensors reporting healthy again).
+         */
+        function clearDiagnosticState() {
+            UI.diagPanel.style.display = 'none';
+            UI.tempCard.classList.remove('faulted');
+            UI.humCard.classList.remove('faulted');
+            UI.tempFaultBadge.classList.remove('visible');
+            UI.humFaultBadge.classList.remove('visible');
+        }
+
+        /**
+         * Full UI cleanup when connection is lost — either manually via the Disconnect
+         * button or automatically from signal loss. Fires via 'gattserverdisconnected'.
          */
         function handleDisconnect() {
             updateStatus('System Offline', 'var(--text-tertiary)', false, false);
-            
-            UI.btn.style.display = 'block';
-            UI.btn.disabled = false;
-            UI.btn.innerText = "Reconnect Device";
-            
-            bleBuffer = ""; // Flush memory
-            UI.diagPanel.style.display = 'none'; 
-            
-            // Reset Data
-            UI.temp.innerText = '--';
-            UI.hum.innerText = '--';
+
+            // Swap buttons back to their offline state
+            UI.connectBtn.style.display    = 'block';
+            UI.connectBtn.disabled         = false;
+            UI.connectBtn.innerText        = "Reconnect Device";
+            UI.disconnectBtn.style.display = 'none';
+            UI.disconnectBtn.disabled      = false;
+            UI.disconnectBtn.innerText     = "\u2715\u00a0\u00a0Disconnect Device";
+
+            bleBuffer = ""; // Flush the packet buffer to prevent stale data on reconnect
+
+            // Remove all diagnostic and fault visual state
+            clearDiagnosticState();
+
+            // Reset all metric readouts to their default offline dashes
+            UI.temp.innerText  = '--';
+            UI.hum.innerText   = '--';
             UI.smoke.innerText = '-- ppm';
-            UI.gas.innerText = '-- ppm';
-            
-            // Reset Safety Module Aesthetics
-            UI.safetyMod.style.borderColor = 'var(--surface-border)';
-            UI.safetyMod.style.boxShadow = 'var(--shadow-elevation)';
-            UI.safetyStat.innerText = 'Unknown';
-            UI.safetyStat.style.color = 'var(--text-tertiary)';
-            UI.safetyStat.style.background = 'transparent';
+            UI.gas.innerText   = '-- ppm';
+
+            // Reset value color overrides back to defaults
+            UI.temp.style.color  = 'var(--text-primary)';
+            UI.hum.style.color   = 'var(--text-primary)';
             UI.smoke.style.color = 'var(--text-tertiary)';
-            UI.gas.style.color = 'var(--text-tertiary)';
+            UI.gas.style.color   = 'var(--text-tertiary)';
+
+            // Reset Safety Module back to its default unknown/offline appearance
+            UI.safetyMod.style.borderColor = 'var(--surface-border)';
+            UI.safetyMod.style.boxShadow   = 'var(--shadow-elevation)';
+            UI.safetyStat.innerText         = 'Unknown';
+            UI.safetyStat.style.color       = 'var(--text-tertiary)';
+            UI.safetyStat.style.background  = 'transparent';
         }
 
         /**
-         * Helper utility for updating the top status badge.
+         * Helper utility for updating the top-right connection status badge.
+         * @param {string}  text         - Label text to display in the badge
+         * @param {string}  color        - CSS color value for the animated status dot
+         * @param {boolean} isPulsing    - Whether to animate the dot with a pulse ring
+         * @param {boolean} isConnected  - When true, highlights the badge border in blue
          */
         function updateStatus(text, color, isPulsing, isConnected = false) {
             UI.statusTxt.innerText = text;
             UI.statusDot.style.background = color;
             UI.statusBadge.style.borderColor = isConnected ? 'rgba(10, 132, 255, 0.4)' : 'var(--surface-border)';
-            
+
             if (isPulsing) {
                 UI.statusDot.classList.add('pulsing');
             } else {
