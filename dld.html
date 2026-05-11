@@ -1,144 +1,1486 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>KHEECHOW Photobooth</title>
-    <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #0f0f11; color: white; text-align: center; padding: 20px; margin: 0; }
-        h1 { color: #00e5ff; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 5px; }
-        p { color: #888; font-size: 14px; margin-bottom: 20px; }
-        
-        #photoCanvas { background: #1a1a2e; border: 4px solid #00e5ff; border-radius: 10px; max-width: 100%; box-shadow: 0 0 20px rgba(0, 229, 255, 0.3); margin: 20px 0; image-rendering: pixelated; }
-        
-        .btn { background: #00e5ff; color: #000; padding: 15px 30px; font-size: 18px; font-weight: bold; border: none; cursor: pointer; border-radius: 50px; text-decoration: none; display: inline-block; transition: 0.3s; margin: 10px; box-shadow: 0 4px 15px rgba(0, 229, 255, 0.4); }
-        .btn:hover { background: #00b3cc; transform: translateY(-2px); }
-        .btn:disabled { background: #333; color: #777; cursor: not-allowed; box-shadow: none; transform: none; }
-        
-        #status { margin-top: 15px; color: #aaa; font-family: monospace; font-size: 13px; }
-        
-        .progress-container { width: 100%; max-width: 320px; background: #222; border-radius: 5px; margin: 10px auto; overflow: hidden; height: 8px; }
-        #progressBar { width: 0%; height: 100%; background: #00e5ff; transition: width 0.1s ease; }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>KHEECHOW — Photobooth Portal</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;700;800&display=swap" rel="stylesheet">
+<style>
+  /* ── TOKENS ── */
+  :root {
+    --bg:       #080810;
+    --surface:  #0f0f1c;
+    --card:     #141424;
+    --border:   #ffffff14;
+    --border2:  #ffffff28;
+    --accent:   #c8f000;
+    --accent2:  #00f0c8;
+    --red:      #ff3c5a;
+    --text:     #f0f0f8;
+    --muted:    #7070a0;
+    --font-d:   'Syne', sans-serif;
+    --font-m:   'Space Mono', monospace;
+    --r:        12px;
+    --r-lg:     20px;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: var(--font-m);
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* ── SCAN-LINE TEXTURE ── */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(0,0,0,0.12) 2px,
+      rgba(0,0,0,0.12) 4px
+    );
+    pointer-events: none;
+    z-index: 9999;
+  }
+
+  /* ── LAYOUT ── */
+  .shell {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 0 24px 120px;
+  }
+
+  /* ── HEADER ── */
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 32px 0 28px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 40px;
+  }
+
+  .logo {
+    font-family: var(--font-d);
+    font-size: 28px;
+    font-weight: 800;
+    letter-spacing: -1px;
+  }
+  .logo span { color: var(--accent); }
+
+  .header-right { display: flex; align-items: center; gap: 16px; }
+
+  .pill {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px;
+    border-radius: 999px;
+    border: 1px solid var(--border2);
+    font-size: 12px;
+    font-family: var(--font-m);
+    color: var(--muted);
+    background: var(--surface);
+  }
+  .dot {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: var(--muted);
+    transition: background 0.3s;
+  }
+  .dot.live  { background: var(--accent); box-shadow: 0 0 6px var(--accent); }
+  .dot.error { background: var(--red); }
+
+  /* ── CONNECT PANEL ── */
+  #connectPanel {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 420px;
+    text-align: center;
+    gap: 28px;
+  }
+
+  .connect-ring {
+    width: 120px; height: 120px;
+    border-radius: 50%;
+    border: 2px solid var(--border2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+  }
+  .connect-ring::before {
+    content: '';
+    position: absolute;
+    inset: -8px;
+    border-radius: 50%;
+    border: 1px solid var(--border);
+    animation: pulse-ring 2s ease-in-out infinite;
+  }
+  @keyframes pulse-ring {
+    0%,100% { opacity: 0.3; transform: scale(1); }
+    50% { opacity: 0.8; transform: scale(1.06); }
+  }
+  .bt-icon {
+    font-size: 48px;
+    color: var(--accent2);
+    line-height: 1;
+    font-family: var(--font-d);
+    font-weight: 800;
+  }
+
+  .connect-title {
+    font-family: var(--font-d);
+    font-size: 36px;
+    font-weight: 800;
+    letter-spacing: -1px;
+    line-height: 1.1;
+  }
+  .connect-title em {
+    font-style: normal;
+    color: var(--accent);
+  }
+  .connect-sub {
+    font-size: 13px;
+    color: var(--muted);
+    max-width: 360px;
+    line-height: 1.7;
+  }
+
+  /* ── BUTTONS ── */
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 14px 28px;
+    border-radius: 999px;
+    border: none;
+    font-family: var(--font-m);
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-decoration: none;
+  }
+  .btn-accent {
+    background: var(--accent);
+    color: #080810;
+  }
+  .btn-accent:hover { background: #d8ff00; transform: translateY(-2px); }
+  .btn-accent:disabled { background: #303030; color: var(--muted); cursor: not-allowed; transform: none; }
+
+  .btn-ghost {
+    background: transparent;
+    color: var(--text);
+    border: 1px solid var(--border2);
+  }
+  .btn-ghost:hover { border-color: var(--accent); color: var(--accent); }
+  .btn-ghost.active { border-color: var(--accent); color: var(--accent); background: rgba(200,240,0,0.08); }
+
+  .btn-sm { padding: 8px 18px; font-size: 11px; }
+
+  /* ── STATUS LOG ── */
+  .status-bar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 20px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--r);
+    font-size: 12px;
+    font-family: var(--font-m);
+    color: var(--muted);
+    margin-bottom: 32px;
+  }
+  .status-bar span { color: var(--text); }
+
+  /* ── PROGRESS BAR ── */
+  .progress-wrap {
+    height: 3px;
+    background: var(--border);
+    border-radius: 2px;
+    overflow: hidden;
+    margin-bottom: 32px;
+    opacity: 0;
+    transition: opacity 0.3s;
+  }
+  .progress-wrap.active { opacity: 1; }
+  .progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--accent2), var(--accent));
+    width: 0%;
+    transition: width 0.15s ease;
+  }
+
+  /* ── GALLERY SECTION ── */
+  #gallerySection { display: none; }
+
+  .section-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    margin-bottom: 20px;
+  }
+  .section-title {
+    font-family: var(--font-d);
+    font-size: 22px;
+    font-weight: 700;
+  }
+  .count-badge {
+    font-size: 11px;
+    font-family: var(--font-m);
+    color: var(--accent);
+    background: rgba(200,240,0,0.1);
+    border: 1px solid rgba(200,240,0,0.25);
+    padding: 3px 10px;
+    border-radius: 999px;
+    margin-left: 12px;
+  }
+
+  /* ── THUMBNAIL STRIP ── */
+  .thumb-strip {
+    display: flex;
+    gap: 10px;
+    overflow-x: auto;
+    padding-bottom: 8px;
+    margin-bottom: 28px;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border2) transparent;
+  }
+
+  .thumb {
+    flex: 0 0 100px;
+    height: 72px;
+    border-radius: var(--r);
+    overflow: hidden;
+    border: 2px solid transparent;
+    cursor: pointer;
+    transition: border-color 0.2s, transform 0.2s;
+    position: relative;
+    background: var(--surface);
+  }
+  .thumb:hover { transform: translateY(-3px); }
+  .thumb.selected { border-color: var(--accent); }
+  .thumb canvas { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .thumb .num {
+    position: absolute;
+    bottom: 4px; right: 6px;
+    font-size: 10px;
+    font-family: var(--font-m);
+    color: rgba(255,255,255,0.8);
+    text-shadow: 0 1px 3px rgba(0,0,0,0.8);
+  }
+  .thumb.loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .thumb .loading-bar {
+    width: 60%;
+    height: 3px;
+    background: var(--border2);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+  .thumb .loading-fill {
+    height: 100%;
+    background: var(--accent);
+    animation: shimmer 1s ease-in-out infinite;
+  }
+  @keyframes shimmer {
+    0% { width: 0%; } 50% { width: 100%; } 100% { width: 0%; }
+  }
+
+  /* ── MAIN VIEWER ── */
+  .viewer-wrap {
+    display: grid;
+    grid-template-columns: 1fr 280px;
+    gap: 24px;
+    margin-bottom: 28px;
+  }
+  @media (max-width: 768px) {
+    .viewer-wrap { grid-template-columns: 1fr; }
+  }
+
+  .viewer-canvas-wrap {
+    position: relative;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--r-lg);
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 320px;
+  }
+
+  #mainCanvas {
+    max-width: 100%;
+    max-height: 480px;
+    display: block;
+    image-rendering: pixelated;
+  }
+
+  .canvas-overlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--font-d);
+    font-size: 18px;
+    color: var(--muted);
+    flex-direction: column;
+    gap: 12px;
+  }
+  .canvas-overlay.hidden { display: none; }
+
+  /* ── SIDEBAR ── */
+  .sidebar {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .panel {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--r-lg);
+    padding: 18px;
+  }
+  .panel-title {
+    font-size: 10px;
+    font-family: var(--font-m);
+    color: var(--muted);
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    margin-bottom: 14px;
+  }
+
+  /* ── FILTERS ── */
+  .filter-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+
+  .filter-btn {
+    padding: 10px 6px;
+    border-radius: var(--r);
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text);
+    font-size: 11px;
+    font-family: var(--font-m);
+    cursor: pointer;
+    text-align: center;
+    transition: all 0.2s;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 5px;
+    line-height: 1.2;
+  }
+  .filter-btn:hover { border-color: var(--border2); background: var(--surface); }
+  .filter-btn.active { border-color: var(--accent); color: var(--accent); background: rgba(200,240,0,0.06); }
+
+  .filter-swatch {
+    width: 36px; height: 24px;
+    border-radius: 4px;
+    overflow: hidden;
+    pointer-events: none;
+  }
+  .filter-swatch canvas { width: 100%; height: 100%; }
+
+  /* ── ADJUSTMENTS ── */
+  .adj-row {
+    margin-bottom: 14px;
+  }
+  .adj-label {
+    display: flex;
+    justify-content: space-between;
+    font-size: 11px;
+    color: var(--muted);
+    margin-bottom: 6px;
+  }
+  .adj-label span { color: var(--text); font-weight: 700; }
+
+  input[type=range] {
+    width: 100%;
+    accent-color: var(--accent);
+    cursor: pointer;
+  }
+
+  /* ── COLLAGE ── */
+  .layout-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+  }
+
+  .layout-btn {
+    aspect-ratio: 4/3;
+    border-radius: var(--r);
+    border: 1px solid var(--border);
+    background: var(--surface);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+    position: relative;
+    overflow: hidden;
+    padding: 6px;
+  }
+  .layout-btn:hover { border-color: var(--border2); }
+  .layout-btn.active { border-color: var(--accent); }
+
+  .layout-preview {
+    width: 100%;
+    height: 100%;
+    display: grid;
+    gap: 2px;
+  }
+
+  .lp-cell {
+    background: var(--border2);
+    border-radius: 2px;
+  }
+
+  /* ── COLLAGE CANVAS ── */
+  #collageSection {
+    display: none;
+    margin-top: 28px;
+  }
+  .collage-wrap {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--r-lg);
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 20px;
+  }
+  #collageCanvas {
+    max-width: 100%;
+    border-radius: var(--r);
+    image-rendering: pixelated;
+    display: block;
+  }
+
+  /* ── ACTION ROW ── */
+  .action-row {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-bottom: 28px;
+    align-items: center;
+  }
+
+  /* ── STICKER OVERLAY ── */
+  .sticker-bar {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  .sticker-opt {
+    width: 44px; height: 44px;
+    border-radius: 50%;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    font-size: 22px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.15s;
+    line-height: 1;
+  }
+  .sticker-opt:hover { border-color: var(--accent2); transform: scale(1.15); }
+
+  /* ── STICKER CANVAS OVERLAY ── */
+  #stickerCanvas {
+    position: absolute;
+    inset: 0;
+    cursor: crosshair;
+  }
+
+  /* ── RESPONSIVE ── */
+  @media (max-width: 600px) {
+    .connect-title { font-size: 26px; }
+    header { flex-direction: column; gap: 16px; }
+    .viewer-wrap { grid-template-columns: 1fr; }
+  }
+</style>
 </head>
 <body>
-    <h1>KHEECHOW PORTAL</h1>
-    <p>Connect your phone to sync your snapshot.</p>
-    
-    <button id="connectBtn" class="btn">Connect Bluetooth</button>
-    <a id="downloadBtn" class="btn" style="display:none;" download="Kheechow_Snap.png">Save to Camera Roll</a>
-    
-    <div class="progress-container"><div id="progressBar"></div></div>
-    <div id="status">Status: Waiting for user connection...</div>
-    
-    <canvas id="photoCanvas" width="320" height="240"></canvas>
 
-    <script>
-        // BLE UUIDs
-        const SERVICE_UUID = "4fafc201-1fb5-459e-8fcc-c5c9c331914b";
-        const CHARACTERISTIC_UUID = "beb5483e-36e1-4688-b7f5-ea07361b26a8";
-        
-        // Chunking Math
-        const TOTAL_CHUNKS = Math.ceil(9600 / 400); // Expecting 24 chunks
-        let imageBuffer = new Uint8Array(9600);
-        let chunksReceived = 0;
+<div class="shell">
 
-        // UI Elements
-        const connectBtn = document.getElementById('connectBtn');
-        const downloadBtn = document.getElementById('downloadBtn');
-        const statusTxt = document.getElementById('status');
-        const progressBar = document.getElementById('progressBar');
+  <!-- HEADER -->
+  <header>
+    <div class="logo">KHEE<span>CHOW</span></div>
+    <div class="header-right">
+      <div class="pill">
+        <div class="dot" id="statusDot"></div>
+        <span id="statusText">Not connected</span>
+      </div>
+    </div>
+  </header>
 
-        connectBtn.addEventListener('click', async () => {
-            try {
-                statusTxt.innerText = "Status: Scanning for KHEECHOW_IOT...";
-                
-                // Open Bluetooth pairing menu
-                const device = await navigator.bluetooth.requestDevice({
-                    filters: [{ name: 'KHEECHOW_IOT' }],
-                    optionalServices: [SERVICE_UUID]
-                });
+  <!-- CONNECT PANEL -->
+  <div id="connectPanel">
+    <div class="connect-ring">
+      <div class="bt-icon">⌘</div>
+    </div>
+    <div>
+      <div class="connect-title">Your photos,<br><em>wirelessly.</em></div>
+    </div>
+    <div class="connect-sub">
+      Connect to your Kheechow booth via Bluetooth. All photos taken during the session will appear here automatically.
+    </div>
+    <button class="btn btn-accent" id="connectBtn" onclick="connectBLE()">
+      Connect to Booth
+    </button>
+    <div style="font-size:11px;color:var(--muted);">Requires Chrome or Edge on desktop/Android</div>
+  </div>
 
-                device.addEventListener('gattserverdisconnected', () => {
-                    statusTxt.innerText = "Status: Disconnected. Refresh to reconnect.";
-                    connectBtn.disabled = false;
-                });
+  <!-- STATUS + PROGRESS -->
+  <div class="status-bar" id="statusBar" style="display:none;">
+    <div class="dot" id="statusDot2"></div>
+    <span id="statusLog">Ready</span>
+  </div>
+  <div class="progress-wrap" id="progressWrap">
+    <div class="progress-fill" id="progressFill"></div>
+  </div>
 
-                statusTxt.innerText = "Status: Connecting to Machine...";
-                const server = await device.gatt.connect();
-                
-                const service = await server.getPrimaryService(SERVICE_UUID);
-                const characteristic = await service.getCharacteristic(CHARACTERISTIC_UUID);
+  <!-- GALLERY SECTION -->
+  <div id="gallerySection">
 
-                statusTxt.innerText = "Status: Link Established! (Take a photo on the arcade...)";
-                connectBtn.disabled = true;
-                connectBtn.style.display = "none"; // Hide connect button once linked
+    <!-- THUMBNAIL STRIP -->
+    <div class="section-head">
+      <div class="section-title">
+        Gallery
+        <span class="count-badge" id="countBadge">0 photos</span>
+      </div>
+      <button class="btn btn-ghost btn-sm" onclick="toggleCollage()">Collage Mode</button>
+    </div>
 
-                // Listen for Data Stream
-                characteristic.addEventListener('characteristicvaluechanged', handleDataChunk);
-                await characteristic.startNotifications();
+    <div class="thumb-strip" id="thumbStrip"></div>
 
-            } catch (error) {
-                statusTxt.innerText = "Error: " + error;
-                console.error(error);
-                connectBtn.disabled = false;
-            }
-        });
+    <!-- MAIN VIEWER + SIDEBAR -->
+    <div class="viewer-wrap">
 
-        // Reassemble the incoming chunks
-        function handleDataChunk(event) {
-            const value = event.target.value;
-            const chunkIndex = value.getUint8(0); // The first byte is the sequence ID
-            const chunkData = new Uint8Array(value.buffer, 1); // The rest is the image data
-            
-            // Insert the chunk into the main buffer at the correct position
-            imageBuffer.set(chunkData, chunkIndex * 400);
-            chunksReceived++;
-            
-            // Update Loading Bar UI
-            let progress = (chunksReceived / TOTAL_CHUNKS) * 100;
-            progressBar.style.width = progress + '%';
-            statusTxt.innerText = `Status: Syncing Photo... ${Math.round(progress)}%`;
+      <!-- CANVAS -->
+      <div class="viewer-canvas-wrap">
+        <canvas id="mainCanvas" width="640" height="480"></canvas>
+        <canvas id="stickerCanvas" width="640" height="480" onclick="placeStickerAt(event)"></canvas>
+        <div class="canvas-overlay" id="canvasPlaceholder">
+          <span style="font-size:32px;">📷</span>
+          Take a photo on the arcade to begin
+        </div>
+      </div>
 
-            // Render when all chunks arrive
-            if (chunksReceived >= TOTAL_CHUNKS) {
-                renderImage();
-                chunksReceived = 0; // Reset counter for the next photo
-            }
-        }
+      <!-- SIDEBAR -->
+      <div class="sidebar">
 
-        // Draw data to canvas
-        function renderImage() {
-            statusTxt.innerText = "Status: Processing Image...";
-            const canvas = document.getElementById('photoCanvas');
-            const ctx = canvas.getContext('2d');
-            const imgData = ctx.createImageData(320, 240);
-            
-            let pixelIndex = 0;
-            
-            // Loop through 1-bit monochrome and map to RGBA colors
-            for (let i = 0; i < imageBuffer.length; i++) {
-                let byteVal = imageBuffer[i];
-                for (let bit = 7; bit >= 0; bit--) {
-                    let isDark = (byteVal & (1 << bit)) !== 0;
-                    let color = isDark ? 20 : 240; // Soft black for darks, off-white for lights
-                    
-                    imgData.data[pixelIndex++] = color; // Red
-                    imgData.data[pixelIndex++] = color; // Green
-                    imgData.data[pixelIndex++] = color; // Blue
-                    imgData.data[pixelIndex++] = 255;   // Alpha (100% visible)
-                }
-            }
-            
-            ctx.putImageData(imgData, 0, 0);
-            
-            // Reveal the Download Button
-            downloadBtn.href = canvas.toDataURL("image/png");
-            downloadBtn.style.display = "inline-block";
-            
-            statusTxt.innerText = "Status: Transfer Complete! Take another photo to overwrite.";
-            progressBar.style.width = '0%'; // Reset bar
-        }
-    </script>
+        <!-- FILTERS -->
+        <div class="panel">
+          <div class="panel-title">Filters</div>
+          <div class="filter-grid" id="filterGrid"></div>
+        </div>
+
+        <!-- ADJUSTMENTS -->
+        <div class="panel">
+          <div class="panel-title">Adjustments</div>
+          <div class="adj-row">
+            <div class="adj-label">Brightness <span id="brLabel">0</span></div>
+            <input type="range" id="slBrightness" min="-100" max="100" value="0" oninput="applyAdjustments()">
+          </div>
+          <div class="adj-row">
+            <div class="adj-label">Contrast <span id="coLabel">0</span></div>
+            <input type="range" id="slContrast" min="-100" max="100" value="0" oninput="applyAdjustments()">
+          </div>
+          <div class="adj-row">
+            <div class="adj-label">Saturation <span id="saLabel">0</span></div>
+            <input type="range" id="slSaturation" min="-100" max="100" value="0" oninput="applyAdjustments()">
+          </div>
+          <div class="adj-row">
+            <div class="adj-label">Vignette <span id="viLabel">0</span></div>
+            <input type="range" id="slVignette" min="0" max="100" value="0" oninput="applyAdjustments()">
+          </div>
+          <button class="btn btn-ghost btn-sm" style="width:100%;justify-content:center;margin-top:4px;" onclick="resetAdj()">Reset</button>
+        </div>
+
+        <!-- STICKERS -->
+        <div class="panel">
+          <div class="panel-title">Stickers</div>
+          <div class="sticker-bar" id="stickerBar"></div>
+          <button class="btn btn-ghost btn-sm" style="margin-top:12px;width:100%;justify-content:center;" onclick="clearStickers()">Clear Stickers</button>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ACTIONS -->
+    <div class="action-row">
+      <button class="btn btn-accent" id="downloadBtn" onclick="downloadCurrent()" style="display:none;">
+        ↓ Save Photo
+      </button>
+      <button class="btn btn-ghost" onclick="downloadAll()" id="downloadAllBtn" style="display:none;">
+        ↓ Save All
+      </button>
+      <button class="btn btn-ghost" onclick="requestNextImage()">
+        ⟳ Sync New Photo
+      </button>
+    </div>
+
+    <!-- COLLAGE SECTION -->
+    <div id="collageSection">
+      <div class="section-head">
+        <div class="section-title">Collage</div>
+        <button class="btn btn-ghost btn-sm" onclick="downloadCollage()">↓ Save Collage</button>
+      </div>
+
+      <div class="panel" style="margin-bottom:16px;">
+        <div class="panel-title">Layout</div>
+        <div class="layout-grid" id="layoutGrid"></div>
+      </div>
+
+      <div class="collage-wrap">
+        <canvas id="collageCanvas"></canvas>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+'use strict';
+
+// ── BLE CONFIG ───────────────────────────────────────────────────────────────
+const SERVICE_UUID     = '4fafc201-1fb5-459e-8fcc-c5c9c331914b';
+const CHAR_IMAGE_UUID  = 'beb5483e-36e1-4688-b7f5-ea07361b26a8';
+const CHAR_STATUS_UUID = '12345678-1234-1234-1234-123456789abc';
+const CHAR_CMD_UUID    = 'abcdef01-1234-1234-1234-abcdef012345';
+
+// ── STATE ────────────────────────────────────────────────────────────────────
+let bleDevice     = null;
+let bleServer     = null;
+let charImage     = null;
+let charStatus    = null;
+let charCmd       = null;
+
+// Gallery: array of { imageData: Uint8Array, width, height, canvas, filter, adj, stickers }
+const gallery     = [];
+let activeIdx     = -1;   // which photo is being viewed
+let activeFilter  = 'none';
+let stickers      = [];   // [{emoji, x, y}] for active photo
+let activeLayout  = 0;
+
+// Incoming packet reassembly
+let rxImages      = {};   // keyed by imageIdx: { chunks: Map<chunkIdx, Uint8Array>, totalChunks, width, height }
+
+// ── FILTERS ─────────────────────────────────────────────────────────────────
+const FILTERS = [
+  { id: 'none',      label: 'Original',   fn: null },
+  { id: 'bw',        label: 'B & W',      fn: filterBW },
+  { id: 'sepia',     label: 'Sepia',      fn: filterSepia },
+  { id: 'vivid',     label: 'Vivid',      fn: filterVivid },
+  { id: 'cool',      label: 'Cool',       fn: filterCool },
+  { id: 'warm',      label: 'Warm',       fn: filterWarm },
+  { id: 'neon',      label: 'Neon',       fn: filterNeon },
+  { id: 'retro',     label: 'Retro',      fn: filterRetro },
+  { id: 'invert',    label: 'Invert',     fn: filterInvert },
+  { id: 'fade',      label: 'Fade',       fn: filterFade },
+];
+
+// ── COLLAGE LAYOUTS ──────────────────────────────────────────────────────────
+const LAYOUTS = [
+  { id: 'strip3', label: '3-Strip', cols: 1, rows: 3, cells: [[0,0,1,0.33],[0,0.33,1,0.33],[0,0.66,1,0.34]] },
+  { id: 'grid4',  label: '2×2 Grid', cols: 2, rows: 2, cells: [[0,0,.5,.5],[.5,0,.5,.5],[0,.5,.5,.5],[.5,.5,.5,.5]] },
+  { id: 'main1',  label: 'Hero + 2', cols: 2, rows: 2, cells: [[0,0,.65,1],[.65,0,.35,.5],[.65,.5,.35,.5]] },
+  { id: 'row3',   label: 'Row of 3', cols: 3, rows: 1, cells: [[0,0,.33,1],[.33,0,.33,1],[.66,0,.34,1]] },
+  { id: 'cross',  label: 'Cross',    cols: 3, rows: 3, cells: [[.33,0,.34,.33],[0,.33,1,.34],[.33,.66,.34,.34]] },
+  { id: 'full1',  label: 'Single',   cols: 1, rows: 1, cells: [[0,0,1,1]] },
+];
+
+// ── STICKER OPTIONS ──────────────────────────────────────────────────────────
+const STICKER_EMOJIS = ['⭐','🔥','❤️','🎉','😎','🌈','💫','🎸','🤙','✨','💀','🦋'];
+
+// ── UI HELPERS ───────────────────────────────────────────────────────────────
+function setStatus(msg, type = 'idle') {
+  document.getElementById('statusLog').textContent = msg;
+  const dot1 = document.getElementById('statusDot');
+  const dot2 = document.getElementById('statusDot2');
+  const cls  = type === 'live' ? 'live' : type === 'error' ? 'error' : '';
+  [dot1, dot2].forEach(d => { d.className = 'dot ' + cls; });
+  document.getElementById('statusText').textContent = msg;
+}
+
+function setProgress(pct) {
+  const wrap = document.getElementById('progressWrap');
+  const fill = document.getElementById('progressFill');
+  wrap.classList.toggle('active', pct > 0 && pct < 100);
+  fill.style.width = pct + '%';
+}
+
+function showStatusBar() {
+  document.getElementById('statusBar').style.display = 'flex';
+}
+
+// ── BLE CONNECTION ───────────────────────────────────────────────────────────
+async function connectBLE() {
+  if (!navigator.bluetooth) {
+    alert('Web Bluetooth not supported. Use Chrome or Edge on desktop/Android.');
+    return;
+  }
+  try {
+    setStatus('Scanning for KHEECHOW_IOT…');
+    bleDevice = await navigator.bluetooth.requestDevice({
+      filters: [{ name: 'KHEECHOW_IOT' }],
+      optionalServices: [SERVICE_UUID],
+    });
+
+    bleDevice.addEventListener('gattserverdisconnected', onDisconnected);
+    setStatus('Connecting…');
+
+    bleServer = await bleDevice.gatt.connect();
+    const svc = await bleServer.getPrimaryService(SERVICE_UUID);
+
+    charImage  = await svc.getCharacteristic(CHAR_IMAGE_UUID);
+    charStatus = await svc.getCharacteristic(CHAR_STATUS_UUID);
+    charCmd    = await svc.getCharacteristic(CHAR_CMD_UUID);
+
+    charImage.addEventListener('characteristicvaluechanged', onImageChunk);
+    charStatus.addEventListener('characteristicvaluechanged', onStatusMsg);
+
+    await charImage.startNotifications();
+    await charStatus.startNotifications();
+
+    document.getElementById('connectPanel').style.display = 'none';
+    document.getElementById('gallerySection').style.display = 'block';
+    showStatusBar();
+    setStatus('Connected to KHEECHOW_IOT', 'live');
+
+    // Ask ESP32 how many images it already has
+    sendCmd('LIST');
+
+  } catch(e) {
+    setStatus('Error: ' + e.message, 'error');
+    console.error(e);
+  }
+}
+
+function onDisconnected() {
+  setStatus('Disconnected — reconnect to continue', 'error');
+  bleDevice = bleServer = charImage = charStatus = charCmd = null;
+  document.getElementById('connectPanel').style.display = 'flex';
+  document.getElementById('gallerySection').style.display = 'none';
+}
+
+function sendCmd(cmd) {
+  if (!charCmd) return;
+  const enc = new TextEncoder();
+  charCmd.writeValue(enc.encode(cmd)).catch(e => console.warn('CMD write error', e));
+}
+
+function requestNextImage() {
+  sendCmd('SEND:LATEST');
+  setStatus('Requesting latest photo…');
+}
+
+// ── BLE STATUS MESSAGES ──────────────────────────────────────────────────────
+function onStatusMsg(event) {
+  const txt = new TextDecoder().decode(event.target.value);
+  console.log('[ESP32 STATUS]', txt);
+
+  if (txt.startsWith('GALLERY:')) {
+    const n = parseInt(txt.split(':')[1]);
+    updateCountBadge(n);
+    if (n > gallery.length) setStatus(`${n} photo(s) on booth — syncing…`);
+  } else if (txt.startsWith('SENDING:')) {
+    // SENDING:imgIdx:width:height:totalChunks
+    const parts = txt.split(':');
+    const imgIdx = parseInt(parts[1]);
+    const w      = parseInt(parts[2]);
+    const h      = parseInt(parts[3]);
+    const total  = parseInt(parts[4]);
+    rxImages[imgIdx] = { chunks: new Map(), totalChunks: total, width: w, height: h };
+    setStatus(`Receiving photo ${imgIdx+1}…`);
+    setProgress(0);
+  } else if (txt.startsWith('DONE:')) {
+    setStatus('Transfer complete!', 'live');
+    setProgress(100);
+    setTimeout(() => setProgress(0), 1000);
+  } else if (txt.startsWith('NEW_IMAGE:')) {
+    setStatus('New photo arriving…');
+  } else {
+    setStatus(txt, bleDevice ? 'live' : 'idle');
+  }
+}
+
+// ── IMAGE CHUNK REASSEMBLY ───────────────────────────────────────────────────
+function onImageChunk(event) {
+  const data = new DataView(event.target.value.buffer);
+  let offset = 0;
+
+  const imgIdx     = data.getUint8(offset++);
+  const chunkHi    = data.getUint8(offset++);
+  const chunkLo    = data.getUint8(offset++);
+  const totalHi    = data.getUint8(offset++);
+  const totalLo    = data.getUint8(offset++);
+  const chunkIdx   = (chunkHi << 8) | chunkLo;
+  const totalChunks= (totalHi << 8) | totalLo;
+
+  // Create rx slot if not existing (handles case where SENDING status msg was missed)
+  if (!rxImages[imgIdx]) {
+    rxImages[imgIdx] = { chunks: new Map(), totalChunks, width: 640, height: 480 };
+  }
+  const rx = rxImages[imgIdx];
+  rx.totalChunks = totalChunks;
+
+  // Chunk 0 carries width + height
+  let w = rx.width, h = rx.height;
+  if (chunkIdx === 0) {
+    w = (data.getUint8(offset++) << 8) | data.getUint8(offset++);
+    h = (data.getUint8(offset++) << 8) | data.getUint8(offset++);
+    rx.width  = w;
+    rx.height = h;
+  }
+
+  // Extract pixel bytes
+  const pixBytes = new Uint8Array(event.target.value.buffer, offset);
+  rx.chunks.set(chunkIdx, pixBytes);
+
+  // Progress
+  const pct = Math.round((rx.chunks.size / totalChunks) * 100);
+  setProgress(pct);
+  if (pct % 10 === 0) setStatus(`Syncing photo ${imgIdx+1} — ${pct}%`);
+
+  // Render thumbnail for incomplete frame
+  if (rx.chunks.size % 50 === 0) renderThumbPartial(imgIdx);
+
+  // Check completion
+  if (rx.chunks.size >= totalChunks) {
+    finaliseImage(imgIdx);
+  }
+}
+
+function finaliseImage(imgIdx) {
+  const rx = rxImages[imgIdx];
+  const totalPixBytes = rx.width * rx.height * 2;  // RGB565
+
+  // Reassemble in chunk order
+  const raw = new Uint8Array(totalPixBytes);
+  // Determine pixel payload per chunk
+  const firstPixBytes = 236; // BLE_PAYLOAD(240) - 4 bytes metadata
+  const normPixBytes  = 240;
+  let writePos = 0;
+
+  for (let c = 0; c < rx.totalChunks; c++) {
+    const chunk = rx.chunks.get(c);
+    if (!chunk) continue;
+    raw.set(chunk, writePos);
+    writePos += chunk.byteLength;
+  }
+
+  // Convert RGB565 → RGBA8888
+  const rgba = new Uint8ClampedArray(rx.width * rx.height * 4);
+  for (let i = 0; i < rx.width * rx.height; i++) {
+    const hi = raw[i * 2];
+    const lo = raw[i * 2 + 1];
+    const r5 = (hi >> 3) & 0x1F;
+    const g6 = ((hi & 0x07) << 3) | ((lo >> 5) & 0x07);
+    const b5 = lo & 0x1F;
+    rgba[i*4 + 0] = (r5 << 3) | (r5 >> 2);   // expand to 8-bit
+    rgba[i*4 + 1] = (g6 << 2) | (g6 >> 4);
+    rgba[i*4 + 2] = (b5 << 3) | (b5 >> 2);
+    rgba[i*4 + 3] = 255;
+  }
+
+  // Build offscreen canvas for this image
+  const oc = document.createElement('canvas');
+  oc.width  = rx.width;
+  oc.height = rx.height;
+  const ctx = oc.getContext('2d');
+  ctx.putImageData(new ImageData(rgba, rx.width, rx.height), 0, 0);
+
+  // Store in gallery (update existing slot or add new)
+  let slot = gallery.findIndex(g => g.imgIdx === imgIdx);
+  if (slot === -1) {
+    slot = gallery.length;
+    gallery.push({ imgIdx, canvas: oc, filter: 'none', adj: defaultAdj(), stickers: [] });
+  } else {
+    gallery[slot].canvas = oc;
+  }
+
+  delete rxImages[imgIdx];  // free reassembly memory
+
+  renderThumbFull(slot);
+  selectPhoto(slot);
+  updateCountBadge(gallery.length);
+
+  setStatus(`Photo ${gallery.length} ready!`, 'live');
+  setProgress(0);
+
+  document.getElementById('downloadBtn').style.display = 'inline-flex';
+  document.getElementById('downloadAllBtn').style.display = gallery.length > 1 ? 'inline-flex' : 'none';
+
+  if (activeLayout >= 0) renderCollage();
+}
+
+// ── THUMBNAIL RENDERING ──────────────────────────────────────────────────────
+function renderThumbPartial(imgIdx) {
+  // Show loading state in thumb
+  const id = 'thumb-' + imgIdx;
+  if (!document.getElementById(id)) {
+    addThumbSlot(imgIdx);
+  }
+}
+
+function addThumbSlot(imgIdx) {
+  const strip = document.getElementById('thumbStrip');
+  const div   = document.createElement('div');
+  div.className = 'thumb loading';
+  div.id        = 'thumb-' + imgIdx;
+  div.innerHTML = '<div class="loading-bar"><div class="loading-fill"></div></div>';
+  strip.appendChild(div);
+}
+
+function renderThumbFull(slotIdx) {
+  const photo = gallery[slotIdx];
+  const imgIdx = photo.imgIdx;
+  let div = document.getElementById('thumb-' + imgIdx);
+  if (!div) {
+    div = document.createElement('div');
+    div.id = 'thumb-' + imgIdx;
+    document.getElementById('thumbStrip').appendChild(div);
+  }
+  div.className = 'thumb';
+  div.innerHTML = '';
+  div.onclick   = () => selectPhoto(slotIdx);
+
+  const tc  = document.createElement('canvas');
+  tc.width  = 200;
+  tc.height = 144;
+  const tctx = tc.getContext('2d');
+  tctx.drawImage(photo.canvas, 0, 0, 200, 144);
+  div.appendChild(tc);
+
+  const num = document.createElement('div');
+  num.className = 'num';
+  num.textContent = slotIdx + 1;
+  div.appendChild(num);
+}
+
+// ── PHOTO SELECTION ──────────────────────────────────────────────────────────
+function selectPhoto(slotIdx) {
+  activeIdx = slotIdx;
+  const photo = gallery[slotIdx];
+
+  // Update thumb selection state
+  document.querySelectorAll('.thumb').forEach((t, i) => {
+    t.classList.toggle('selected', i === slotIdx);
+  });
+
+  // Restore this photo's filter + adj
+  activeFilter = photo.filter;
+  loadAdj(photo.adj);
+
+  document.getElementById('canvasPlaceholder').classList.add('hidden');
+  stickers = photo.stickers;
+
+  // Highlight active filter btn
+  document.querySelectorAll('.filter-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.filter === activeFilter);
+  });
+
+  renderMain();
+}
+
+// ── MAIN CANVAS RENDER ───────────────────────────────────────────────────────
+function renderMain() {
+  if (activeIdx < 0 || !gallery[activeIdx]) return;
+  const photo = gallery[activeIdx];
+  const mc    = document.getElementById('mainCanvas');
+  mc.width    = photo.canvas.width;
+  mc.height   = photo.canvas.height;
+
+  const sc = document.getElementById('stickerCanvas');
+  sc.width  = photo.canvas.width;
+  sc.height = photo.canvas.height;
+
+  const ctx = mc.getContext('2d');
+  ctx.drawImage(photo.canvas, 0, 0);
+
+  applyFilter(ctx, mc.width, mc.height, activeFilter);
+  applyAdjustmentsTo(ctx, mc.width, mc.height);
+  applyVignette(ctx, mc.width, mc.height);
+  renderStickersOnCanvas(sc);
+}
+
+// ── FILTER SYSTEM ────────────────────────────────────────────────────────────
+function applyFilter(ctx, w, h, filterId) {
+  const filter = FILTERS.find(f => f.id === filterId);
+  if (!filter || !filter.fn) return;
+  const imgData = ctx.getImageData(0, 0, w, h);
+  filter.fn(imgData.data);
+  ctx.putImageData(imgData, 0, 0);
+}
+
+function filterBW(d) {
+  for (let i = 0; i < d.length; i += 4) {
+    const g = 0.299*d[i] + 0.587*d[i+1] + 0.114*d[i+2];
+    d[i] = d[i+1] = d[i+2] = g;
+  }
+}
+function filterSepia(d) {
+  for (let i = 0; i < d.length; i += 4) {
+    const r=d[i],g=d[i+1],b=d[i+2];
+    d[i]   = Math.min(255, r*0.393 + g*0.769 + b*0.189);
+    d[i+1] = Math.min(255, r*0.349 + g*0.686 + b*0.168);
+    d[i+2] = Math.min(255, r*0.272 + g*0.534 + b*0.131);
+  }
+}
+function filterVivid(d) {
+  for (let i = 0; i < d.length; i += 4) {
+    d[i]   = Math.min(255, d[i]   * 1.3);
+    d[i+1] = Math.min(255, d[i+1] * 1.3);
+    d[i+2] = Math.min(255, d[i+2] * 1.3);
+  }
+}
+function filterCool(d) {
+  for (let i = 0; i < d.length; i += 4) {
+    d[i]   = Math.max(0,   d[i]   - 20);
+    d[i+2] = Math.min(255, d[i+2] + 40);
+  }
+}
+function filterWarm(d) {
+  for (let i = 0; i < d.length; i += 4) {
+    d[i]   = Math.min(255, d[i]   + 40);
+    d[i+1] = Math.min(255, d[i+1] + 10);
+    d[i+2] = Math.max(0,   d[i+2] - 20);
+  }
+}
+function filterNeon(d) {
+  for (let i = 0; i < d.length; i += 4) {
+    const g = 0.299*d[i] + 0.587*d[i+1] + 0.114*d[i+2];
+    d[i]   = g > 128 ? Math.min(255, d[i]   * 2) : 0;
+    d[i+1] = g > 80  ? Math.min(255, d[i+1] * 1.5) : 0;
+    d[i+2] = Math.min(255, d[i+2] * 2);
+  }
+}
+function filterRetro(d) {
+  for (let i = 0; i < d.length; i += 4) {
+    d[i]   = Math.min(255, d[i]   * 0.9 + 30);
+    d[i+1] = Math.min(255, d[i+1] * 0.85 + 20);
+    d[i+2] = Math.min(255, d[i+2] * 0.7 + 10);
+  }
+}
+function filterInvert(d) {
+  for (let i = 0; i < d.length; i += 4) {
+    d[i]=255-d[i]; d[i+1]=255-d[i+1]; d[i+2]=255-d[i+2];
+  }
+}
+function filterFade(d) {
+  for (let i = 0; i < d.length; i += 4) {
+    d[i]   = d[i]   * 0.75 + 50;
+    d[i+1] = d[i+1] * 0.75 + 50;
+    d[i+2] = d[i+2] * 0.75 + 50;
+  }
+}
+
+function setFilter(filterId) {
+  activeFilter = filterId;
+  if (activeIdx >= 0) gallery[activeIdx].filter = filterId;
+  document.querySelectorAll('.filter-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.filter === filterId);
+  });
+  renderMain();
+  renderCollage();
+}
+
+// ── ADJUSTMENTS ──────────────────────────────────────────────────────────────
+function defaultAdj() { return { brightness: 0, contrast: 0, saturation: 0, vignette: 0 }; }
+
+function loadAdj(adj) {
+  document.getElementById('slBrightness').value = adj.brightness;
+  document.getElementById('slContrast').value   = adj.contrast;
+  document.getElementById('slSaturation').value = adj.saturation;
+  document.getElementById('slVignette').value   = adj.vignette;
+  updateAdjLabels(adj);
+}
+
+function updateAdjLabels(adj) {
+  document.getElementById('brLabel').textContent = adj.brightness;
+  document.getElementById('coLabel').textContent = adj.contrast;
+  document.getElementById('saLabel').textContent = adj.saturation;
+  document.getElementById('viLabel').textContent = adj.vignette;
+}
+
+function applyAdjustments() {
+  if (activeIdx < 0) return;
+  const adj = {
+    brightness: parseInt(document.getElementById('slBrightness').value),
+    contrast:   parseInt(document.getElementById('slContrast').value),
+    saturation: parseInt(document.getElementById('slSaturation').value),
+    vignette:   parseInt(document.getElementById('slVignette').value),
+  };
+  gallery[activeIdx].adj = adj;
+  updateAdjLabels(adj);
+  renderMain();
+}
+
+function applyAdjustmentsTo(ctx, w, h) {
+  if (activeIdx < 0) return;
+  const adj = gallery[activeIdx].adj;
+  if (adj.brightness === 0 && adj.contrast === 0 && adj.saturation === 0) return;
+
+  const imgData = ctx.getImageData(0, 0, w, h);
+  const d = imgData.data;
+  const br = adj.brightness;
+  const co = adj.contrast / 100;
+  const sa = 1 + adj.saturation / 100;
+
+  for (let i = 0; i < d.length; i += 4) {
+    let r = d[i], g = d[i+1], b = d[i+2];
+
+    // Brightness
+    r += br; g += br; b += br;
+
+    // Contrast
+    r = (r - 128) * (1 + co) + 128;
+    g = (g - 128) * (1 + co) + 128;
+    b = (b - 128) * (1 + co) + 128;
+
+    // Saturation (convert to grey and blend)
+    const grey = 0.299*r + 0.587*g + 0.114*b;
+    r = grey + (r - grey) * sa;
+    g = grey + (g - grey) * sa;
+    b = grey + (b - grey) * sa;
+
+    d[i]   = Math.max(0, Math.min(255, r));
+    d[i+1] = Math.max(0, Math.min(255, g));
+    d[i+2] = Math.max(0, Math.min(255, b));
+  }
+  ctx.putImageData(imgData, 0, 0);
+}
+
+function applyVignette(ctx, w, h) {
+  if (activeIdx < 0) return;
+  const str = gallery[activeIdx].adj.vignette / 100;
+  if (str === 0) return;
+
+  const gradient = ctx.createRadialGradient(w/2, h/2, h*0.3, w/2, h/2, h*0.8);
+  gradient.addColorStop(0, `rgba(0,0,0,0)`);
+  gradient.addColorStop(1, `rgba(0,0,0,${str * 0.8})`);
+  ctx.fillStyle = gradient;
+  ctx.fillRect(0, 0, w, h);
+}
+
+function resetAdj() {
+  if (activeIdx >= 0) gallery[activeIdx].adj = defaultAdj();
+  loadAdj(defaultAdj());
+  renderMain();
+}
+
+// ── STICKERS ─────────────────────────────────────────────────────────────────
+let activeStickerEmoji = null;
+
+function selectSticker(emoji) {
+  activeStickerEmoji = emoji;
+  document.querySelectorAll('.sticker-opt').forEach(s => {
+    s.style.borderColor = s.dataset.emoji === emoji ? 'var(--accent2)' : '';
+  });
+}
+
+function placeStickerAt(e) {
+  if (!activeStickerEmoji || activeIdx < 0) return;
+  const canvas = document.getElementById('stickerCanvas');
+  const rect = canvas.getBoundingClientRect();
+  const scaleX = canvas.width  / rect.width;
+  const scaleY = canvas.height / rect.height;
+  const x = (e.clientX - rect.left) * scaleX;
+  const y = (e.clientY - rect.top)  * scaleY;
+
+  gallery[activeIdx].stickers.push({ emoji: activeStickerEmoji, x, y });
+  stickers = gallery[activeIdx].stickers;
+  renderStickersOnCanvas(document.getElementById('stickerCanvas'));
+}
+
+function renderStickersOnCanvas(sc) {
+  const ctx = sc.getContext('2d');
+  ctx.clearRect(0, 0, sc.width, sc.height);
+  const size = Math.max(sc.width, sc.height) * 0.08;
+  ctx.font = `${size}px serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  stickers.forEach(s => ctx.fillText(s.emoji, s.x, s.y));
+}
+
+function clearStickers() {
+  if (activeIdx >= 0) gallery[activeIdx].stickers = [];
+  stickers = [];
+  const sc = document.getElementById('stickerCanvas');
+  sc.getContext('2d').clearRect(0, 0, sc.width, sc.height);
+}
+
+// ── COMPOSITED EXPORT (main + sticker layers merged) ─────────────────────────
+function getComposited(slotIdx) {
+  const photo = gallery[slotIdx];
+  const oc  = document.createElement('canvas');
+  oc.width  = photo.canvas.width;
+  oc.height = photo.canvas.height;
+  const ctx = oc.getContext('2d');
+  ctx.drawImage(photo.canvas, 0, 0);
+  applyFilterTo(ctx, oc.width, oc.height, photo.filter);
+  applyAdjToCtx(ctx, oc.width, oc.height, photo.adj);
+  applyVignetteTo(ctx, oc.width, oc.height, photo.adj.vignette);
+
+  // Stickers
+  const sz = Math.max(oc.width, oc.height) * 0.08;
+  ctx.font = `${sz}px serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  photo.stickers.forEach(s => ctx.fillText(s.emoji, s.x, s.y));
+
+  return oc;
+}
+
+// Helper versions of filter/adj that take explicit params
+function applyFilterTo(ctx, w, h, filterId) {
+  const filter = FILTERS.find(f => f.id === filterId);
+  if (!filter || !filter.fn) return;
+  const imgData = ctx.getImageData(0, 0, w, h);
+  filter.fn(imgData.data);
+  ctx.putImageData(imgData, 0, 0);
+}
+
+function applyAdjToCtx(ctx, w, h, adj) {
+  if (adj.brightness === 0 && adj.contrast === 0 && adj.saturation === 0) return;
+  const imgData = ctx.getImageData(0, 0, w, h);
+  const d = imgData.data;
+  const br = adj.brightness, co = adj.contrast/100, sa = 1 + adj.saturation/100;
+  for (let i = 0; i < d.length; i += 4) {
+    let r=d[i],g=d[i+1],b=d[i+2];
+    r+=br; g+=br; b+=br;
+    r=(r-128)*(1+co)+128; g=(g-128)*(1+co)+128; b=(b-128)*(1+co)+128;
+    const gr = 0.299*r+0.587*g+0.114*b;
+    r=gr+(r-gr)*sa; g=gr+(g-gr)*sa; b=gr+(b-gr)*sa;
+    d[i]=Math.max(0,Math.min(255,r));
+    d[i+1]=Math.max(0,Math.min(255,g));
+    d[i+2]=Math.max(0,Math.min(255,b));
+  }
+  ctx.putImageData(imgData, 0, 0);
+}
+
+function applyVignetteTo(ctx, w, h, vigStr) {
+  const str = vigStr / 100;
+  if (str === 0) return;
+  const grad = ctx.createRadialGradient(w/2,h/2,h*0.3,w/2,h/2,h*0.8);
+  grad.addColorStop(0,'rgba(0,0,0,0)');
+  grad.addColorStop(1,`rgba(0,0,0,${str*0.8})`);
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, w, h);
+}
+
+// ── COLLAGE ──────────────────────────────────────────────────────────────────
+let collageVisible = false;
+
+function toggleCollage() {
+  collageVisible = !collageVisible;
+  document.getElementById('collageSection').style.display = collageVisible ? 'block' : 'none';
+  if (collageVisible) renderCollage();
+}
+
+function renderCollage() {
+  if (!collageVisible || gallery.length === 0) return;
+  const layout = LAYOUTS[activeLayout];
+  const cells  = layout.cells;
+
+  const CW = 1200, CH = 900;
+  const cc = document.getElementById('collageCanvas');
+  cc.width  = CW;
+  cc.height = CH;
+  const ctx = cc.getContext('2d');
+
+  ctx.fillStyle = '#0a0a14';
+  ctx.fillRect(0, 0, CW, CH);
+
+  const gap = 8;
+
+  cells.forEach((cell, i) => {
+    const src = gallery[i % gallery.length];
+    if (!src) return;
+
+    const dx = Math.round(cell[0] * CW) + gap;
+    const dy = Math.round(cell[1] * CH) + gap;
+    const dw = Math.round(cell[2] * CW) - gap*2;
+    const dh = Math.round(cell[3] * CH) - gap*2;
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.roundRect(dx, dy, dw, dh, 8);
+    ctx.clip();
+
+    // Draw with aspect-fill
+    const srcW = src.canvas.width, srcH = src.canvas.height;
+    const scale = Math.max(dw/srcW, dh/srcH);
+    const sw = srcW*scale, sh = srcH*scale;
+    const ox = (dw - sw)/2, oy = (dh - sh)/2;
+
+    ctx.drawImage(getComposited(i % gallery.length), dx+ox, dy+oy, sw, sh);
+    ctx.restore();
+  });
+}
+
+// ── DOWNLOAD ─────────────────────────────────────────────────────────────────
+function downloadCurrent() {
+  if (activeIdx < 0) return;
+  const oc = getComposited(activeIdx);
+  const a  = document.createElement('a');
+  a.href     = oc.toDataURL('image/png');
+  a.download = `kheechow_${Date.now()}.png`;
+  a.click();
+}
+
+function downloadAll() {
+  gallery.forEach((_, i) => {
+    setTimeout(() => {
+      const oc = getComposited(i);
+      const a  = document.createElement('a');
+      a.href     = oc.toDataURL('image/png');
+      a.download = `kheechow_${i+1}_${Date.now()}.png`;
+      a.click();
+    }, i * 300);
+  });
+}
+
+function downloadCollage() {
+  renderCollage();
+  const cc = document.getElementById('collageCanvas');
+  const a  = document.createElement('a');
+  a.href     = cc.toDataURL('image/png');
+  a.download = `kheechow_collage_${Date.now()}.png`;
+  a.click();
+}
+
+// ── BADGE ────────────────────────────────────────────────────────────────────
+function updateCountBadge(n) {
+  document.getElementById('countBadge').textContent = n + (n===1?' photo':' photos');
+}
+
+// ── BUILD FILTER GRID ────────────────────────────────────────────────────────
+function buildFilterGrid() {
+  const grid = document.getElementById('filterGrid');
+  grid.innerHTML = '';
+
+  FILTERS.forEach(f => {
+    const btn = document.createElement('button');
+    btn.className    = 'filter-btn' + (f.id === 'none' ? ' active' : '');
+    btn.dataset.filter = f.id;
+    btn.onclick      = () => setFilter(f.id);
+
+    // Mini preview swatch
+    const sw  = document.createElement('div');
+    sw.className = 'filter-swatch';
+    const sc  = document.createElement('canvas');
+    sc.width  = 60; sc.height = 40;
+
+    // Draw a simple gradient to preview filter
+    const stx = sc.getContext('2d');
+    const grd = stx.createLinearGradient(0,0,60,0);
+    grd.addColorStop(0,'#ff6b6b');
+    grd.addColorStop(0.5,'#ffd93d');
+    grd.addColorStop(1,'#6bcb77');
+    stx.fillStyle = grd;
+    stx.fillRect(0,0,60,40);
+    if (f.fn) {
+      const id = stx.getImageData(0,0,60,40);
+      f.fn(id.data);
+      stx.putImageData(id,0,0);
+    }
+    sw.appendChild(sc);
+
+    btn.appendChild(sw);
+    btn.appendChild(document.createTextNode(f.label));
+    grid.appendChild(btn);
+  });
+}
+
+// ── BUILD STICKER BAR ────────────────────────────────────────────────────────
+function buildStickerBar() {
+  const bar = document.getElementById('stickerBar');
+  STICKER_EMOJIS.forEach(emoji => {
+    const btn = document.createElement('div');
+    btn.className    = 'sticker-opt';
+    btn.textContent  = emoji;
+    btn.dataset.emoji = emoji;
+    btn.onclick      = () => selectSticker(emoji);
+    bar.appendChild(btn);
+  });
+}
+
+// ── BUILD LAYOUT GRID ────────────────────────────────────────────────────────
+function buildLayoutGrid() {
+  const grid = document.getElementById('layoutGrid');
+  grid.innerHTML = '';
+
+  LAYOUTS.forEach((layout, i) => {
+    const btn = document.createElement('button');
+    btn.className = 'layout-btn' + (i === 0 ? ' active' : '');
+    btn.title     = layout.label;
+    btn.onclick   = () => {
+      activeLayout = i;
+      document.querySelectorAll('.layout-btn').forEach((b,j) => b.classList.toggle('active', j===i));
+      renderCollage();
+    };
+
+    // Mini layout preview
+    const preview = document.createElement('div');
+    preview.className = 'layout-preview';
+    layout.cells.forEach(cell => {
+      const c = document.createElement('div');
+      c.className = 'lp-cell';
+      c.style.cssText = `
+        position: absolute;
+        left:   ${cell[0]*100}%;
+        top:    ${cell[1]*100}%;
+        width:  ${cell[2]*100}%;
+        height: ${cell[3]*100}%;
+      `;
+      preview.style.position = 'relative';
+      preview.appendChild(c);
+    });
+
+    btn.appendChild(preview);
+    const lbl = document.createElement('div');
+    lbl.style.cssText = 'position:absolute;bottom:3px;left:0;right:0;font-size:9px;color:var(--muted);text-align:center;';
+    lbl.textContent = layout.label;
+    btn.style.position = 'relative';
+    btn.appendChild(lbl);
+
+    grid.appendChild(btn);
+  });
+}
+
+// ── INIT ─────────────────────────────────────────────────────────────────────
+buildFilterGrid();
+buildStickerBar();
+buildLayoutGrid();
+</script>
 </body>
 </html>
