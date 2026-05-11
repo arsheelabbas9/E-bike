@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>KHEECHOW IOT Dashboard</title>
+    <style>
+        body { font-family: 'Courier New', monospace; background: #000; color: #0f0; text-align: center; padding: 50px; }
+        #photoCanvas { background: #fff; border: 3px solid #0f0; box-shadow: 0 0 20px #0f0; max-width: 100%; }
+        .btn { background: #0f0; color: #000; padding: 20px 40px; font-size: 20px; font-weight: bold; border: none; cursor: pointer; border-radius: 5px; }
+        .btn:disabled { background: #050; color: #444; }
+        #status { margin-top: 10px; color: #0f0; }
+    </style>
+</head>
+<body>
+    <h1>SYSTEM: KHEECHOW_IOT</h1>
+    <p>LOCATION: 192.168.IOT.SERIAL</p>
+    
+    <canvas id="photoCanvas" width="320" height="240"></canvas>
+    <br><br>
+    <button id="connectBtn" class="btn">INITIALIZE LINK</button>
+    <div id="status">WAITING FOR HANDSHAKE...</div>
+
+    <script>
+        const SERVICE_UUID = "4fafc201-1fb5-459e-8fcc-c5c9c331914b";
+        const CHARACTERISTIC_UUID = "beb5483e-36e1-4688-b7f5-ea07361b26a8";
+
+        document.getElementById('connectBtn').addEventListener('click', async () => {
+            const status = document.getElementById('status');
+            try {
+                status.innerText = "SEARCHING FOR ESP32...";
+                const device = await navigator.bluetooth.requestDevice({
+                    filters: [{ name: 'KHEECHOW_IOT' }],
+                    optionalServices: [SERVICE_UUID]
+                });
+
+                status.innerText = "CONNECTING...";
+                const server = await device.gatt.connect();
+                const service = await server.getPrimaryService(SERVICE_UUID);
+                const characteristic = await service.getCharacteristic(CHARACTERISTIC_UUID);
+
+                status.innerText = "DOWNLOADING PHOTO...";
+                const value = await characteristic.readValue();
+                renderImage(value);
+                status.innerText = "SYNC COMPLETE.";
+            } catch (error) {
+                status.innerText = "LINK FAILED: " + error;
+                console.error(error);
+            }
+        });
+
+        function renderImage(dataView) {
+            const canvas = document.getElementById('photoCanvas');
+            const ctx = canvas.getContext('2d');
+            const imgData = ctx.createImageData(320, 240);
+            const bytes = new Uint8Array(dataView.buffer);
+            
+            let pixelIndex = 0;
+            // Decode 1-bit RASTER to 32-bit RGBA
+            for (let i = 0; i < bytes.length; i++) {
+                let byteVal = bytes[i];
+                for (let bit = 7; bit >= 0; bit--) {
+                    // Inverting color: if bit is 1, make it black (0)
+                    let color = (byteVal & (1 << bit)) ? 0 : 255;
+                    imgData.data[pixelIndex++] = color; // R
+                    imgData.data[pixelIndex++] = color; // G
+                    imgData.data[pixelIndex++] = color; // B
+                    imgData.data[pixelIndex++] = 255;   // A
+                }
+            }
+            ctx.putImageData(imgData, 0, 0);
+        }
+    </script>
+</body>
+</html>
