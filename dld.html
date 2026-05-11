@@ -1,72 +1,143 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>KHEECHOW IOT Dashboard</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KHEECHOW Photobooth</title>
     <style>
-        body { font-family: 'Courier New', monospace; background: #000; color: #0f0; text-align: center; padding: 50px; }
-        #photoCanvas { background: #fff; border: 3px solid #0f0; box-shadow: 0 0 20px #0f0; max-width: 100%; }
-        .btn { background: #0f0; color: #000; padding: 20px 40px; font-size: 20px; font-weight: bold; border: none; cursor: pointer; border-radius: 5px; }
-        .btn:disabled { background: #050; color: #444; }
-        #status { margin-top: 10px; color: #0f0; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #0f0f11; color: white; text-align: center; padding: 20px; margin: 0; }
+        h1 { color: #00e5ff; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 5px; }
+        p { color: #888; font-size: 14px; margin-bottom: 20px; }
+        
+        #photoCanvas { background: #1a1a2e; border: 4px solid #00e5ff; border-radius: 10px; max-width: 100%; box-shadow: 0 0 20px rgba(0, 229, 255, 0.3); margin: 20px 0; image-rendering: pixelated; }
+        
+        .btn { background: #00e5ff; color: #000; padding: 15px 30px; font-size: 18px; font-weight: bold; border: none; cursor: pointer; border-radius: 50px; text-decoration: none; display: inline-block; transition: 0.3s; margin: 10px; box-shadow: 0 4px 15px rgba(0, 229, 255, 0.4); }
+        .btn:hover { background: #00b3cc; transform: translateY(-2px); }
+        .btn:disabled { background: #333; color: #777; cursor: not-allowed; box-shadow: none; transform: none; }
+        
+        #status { margin-top: 15px; color: #aaa; font-family: monospace; font-size: 13px; }
+        
+        .progress-container { width: 100%; max-width: 320px; background: #222; border-radius: 5px; margin: 10px auto; overflow: hidden; height: 8px; }
+        #progressBar { width: 0%; height: 100%; background: #00e5ff; transition: width 0.1s ease; }
     </style>
 </head>
 <body>
-    <h1>SYSTEM: KHEECHOW_IOT</h1>
-    <p>LOCATION: 192.168.IOT.SERIAL</p>
+    <h1>KHEECHOW PORTAL</h1>
+    <p>Connect your phone to sync your snapshot.</p>
+    
+    <button id="connectBtn" class="btn">Connect Bluetooth</button>
+    <a id="downloadBtn" class="btn" style="display:none;" download="Kheechow_Snap.png">Save to Camera Roll</a>
+    
+    <div class="progress-container"><div id="progressBar"></div></div>
+    <div id="status">Status: Waiting for user connection...</div>
     
     <canvas id="photoCanvas" width="320" height="240"></canvas>
-    <br><br>
-    <button id="connectBtn" class="btn">INITIALIZE LINK</button>
-    <div id="status">WAITING FOR HANDSHAKE...</div>
 
     <script>
+        // BLE UUIDs
         const SERVICE_UUID = "4fafc201-1fb5-459e-8fcc-c5c9c331914b";
         const CHARACTERISTIC_UUID = "beb5483e-36e1-4688-b7f5-ea07361b26a8";
+        
+        // Chunking Math
+        const TOTAL_CHUNKS = Math.ceil(9600 / 400); // Expecting 24 chunks
+        let imageBuffer = new Uint8Array(9600);
+        let chunksReceived = 0;
 
-        document.getElementById('connectBtn').addEventListener('click', async () => {
-            const status = document.getElementById('status');
+        // UI Elements
+        const connectBtn = document.getElementById('connectBtn');
+        const downloadBtn = document.getElementById('downloadBtn');
+        const statusTxt = document.getElementById('status');
+        const progressBar = document.getElementById('progressBar');
+
+        connectBtn.addEventListener('click', async () => {
             try {
-                status.innerText = "SEARCHING FOR ESP32...";
+                statusTxt.innerText = "Status: Scanning for KHEECHOW_IOT...";
+                
+                // Open Bluetooth pairing menu
                 const device = await navigator.bluetooth.requestDevice({
                     filters: [{ name: 'KHEECHOW_IOT' }],
                     optionalServices: [SERVICE_UUID]
                 });
 
-                status.innerText = "CONNECTING...";
+                device.addEventListener('gattserverdisconnected', () => {
+                    statusTxt.innerText = "Status: Disconnected. Refresh to reconnect.";
+                    connectBtn.disabled = false;
+                });
+
+                statusTxt.innerText = "Status: Connecting to Machine...";
                 const server = await device.gatt.connect();
+                
                 const service = await server.getPrimaryService(SERVICE_UUID);
                 const characteristic = await service.getCharacteristic(CHARACTERISTIC_UUID);
 
-                status.innerText = "DOWNLOADING PHOTO...";
-                const value = await characteristic.readValue();
-                renderImage(value);
-                status.innerText = "SYNC COMPLETE.";
+                statusTxt.innerText = "Status: Link Established! (Take a photo on the arcade...)";
+                connectBtn.disabled = true;
+                connectBtn.style.display = "none"; // Hide connect button once linked
+
+                // Listen for Data Stream
+                characteristic.addEventListener('characteristicvaluechanged', handleDataChunk);
+                await characteristic.startNotifications();
+
             } catch (error) {
-                status.innerText = "LINK FAILED: " + error;
+                statusTxt.innerText = "Error: " + error;
                 console.error(error);
+                connectBtn.disabled = false;
             }
         });
 
-        function renderImage(dataView) {
+        // Reassemble the incoming chunks
+        function handleDataChunk(event) {
+            const value = event.target.value;
+            const chunkIndex = value.getUint8(0); // The first byte is the sequence ID
+            const chunkData = new Uint8Array(value.buffer, 1); // The rest is the image data
+            
+            // Insert the chunk into the main buffer at the correct position
+            imageBuffer.set(chunkData, chunkIndex * 400);
+            chunksReceived++;
+            
+            // Update Loading Bar UI
+            let progress = (chunksReceived / TOTAL_CHUNKS) * 100;
+            progressBar.style.width = progress + '%';
+            statusTxt.innerText = `Status: Syncing Photo... ${Math.round(progress)}%`;
+
+            // Render when all chunks arrive
+            if (chunksReceived >= TOTAL_CHUNKS) {
+                renderImage();
+                chunksReceived = 0; // Reset counter for the next photo
+            }
+        }
+
+        // Draw data to canvas
+        function renderImage() {
+            statusTxt.innerText = "Status: Processing Image...";
             const canvas = document.getElementById('photoCanvas');
             const ctx = canvas.getContext('2d');
             const imgData = ctx.createImageData(320, 240);
-            const bytes = new Uint8Array(dataView.buffer);
             
             let pixelIndex = 0;
-            // Decode 1-bit RASTER to 32-bit RGBA
-            for (let i = 0; i < bytes.length; i++) {
-                let byteVal = bytes[i];
+            
+            // Loop through 1-bit monochrome and map to RGBA colors
+            for (let i = 0; i < imageBuffer.length; i++) {
+                let byteVal = imageBuffer[i];
                 for (let bit = 7; bit >= 0; bit--) {
-                    // Inverting color: if bit is 1, make it black (0)
-                    let color = (byteVal & (1 << bit)) ? 0 : 255;
-                    imgData.data[pixelIndex++] = color; // R
-                    imgData.data[pixelIndex++] = color; // G
-                    imgData.data[pixelIndex++] = color; // B
-                    imgData.data[pixelIndex++] = 255;   // A
+                    let isDark = (byteVal & (1 << bit)) !== 0;
+                    let color = isDark ? 20 : 240; // Soft black for darks, off-white for lights
+                    
+                    imgData.data[pixelIndex++] = color; // Red
+                    imgData.data[pixelIndex++] = color; // Green
+                    imgData.data[pixelIndex++] = color; // Blue
+                    imgData.data[pixelIndex++] = 255;   // Alpha (100% visible)
                 }
             }
+            
             ctx.putImageData(imgData, 0, 0);
+            
+            // Reveal the Download Button
+            downloadBtn.href = canvas.toDataURL("image/png");
+            downloadBtn.style.display = "inline-block";
+            
+            statusTxt.innerText = "Status: Transfer Complete! Take another photo to overwrite.";
+            progressBar.style.width = '0%'; // Reset bar
         }
     </script>
 </body>
